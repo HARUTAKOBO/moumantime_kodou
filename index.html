@@ -2,9 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ライチ争奪戦｜整理後仕様版</title>
+<title>ライチ争奪戦｜完成確認版</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <style>
 *{box-sizing:border-box}
 body{
@@ -22,31 +21,23 @@ body{
   background:#1b1f3b;
   padding:12px;
   overflow:auto;
+  z-index:10;
 }
-canvas{background:#000}
+canvas{background:#000;display:block}
 
-/* buttons */
-button{
-  padding:8px 6px;
-  border:none;
-  border-radius:12px;
-  background:#3a3f6b;
-  color:#fff;
-  font-weight:600;
-  cursor:pointer;
-  transition:.15s;
-}
-button:hover{filter:brightness(1.1)}
-button.active{
-  background:linear-gradient(180deg,#ffd86b,#ffb703);
-  color:#000;
+h2{
+  font-size:14px;
+  margin:10px 0 6px;
+  color:#ffd86b;
 }
 
 /* grids */
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.gridFields{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 
 /* inputs */
+.field{min-width:0}
 label{font-size:11px;color:#ccc}
 input{
   width:100%;
@@ -57,7 +48,53 @@ input{
   color:#fff;
   text-align:right;
 }
-.field{margin-bottom:6px}
+
+/* buttons */
+button{
+  padding:8px 6px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(180deg,#4d6bff,#3546c8);
+  color:#fff;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow:0 4px 0 #24339a;
+  transition:.15s;
+}
+button:hover{filter:brightness(1.1)}
+button:active{
+  transform:translateY(3px);
+  box-shadow:0 1px 0 #24339a;
+}
+
+/* tables */
+.table{
+  display:grid;
+  grid-template-columns:60px 1.5fr repeat(4,1fr);
+  gap:4px;
+  font-size:12px;
+}
+.cell{
+  background:#2a2f55;
+  border-radius:8px;
+  padding:4px;
+  text-align:center;
+}
+
+/* result */
+.result{
+  display:grid;
+  grid-template-columns:40px 60px 1fr 60px 80px 60px;
+  gap:4px;
+  font-size:12px;
+}
+.bar{
+  height:6px;
+  background:#444;
+  border-radius:4px;
+  overflow:hidden;
+}
+.bar span{display:block;height:100%}
 </style>
 </head>
 
@@ -73,20 +110,59 @@ input{
   <button onclick="runSim()">▶ シミュレーション</button>
 </div>
 
-<h3>都市（最大2つ）</h3>
-<div class="grid6" id="cityButtons"></div>
+<button style="width:100%;margin-top:6px" onclick="resetSim()">リセット</button>
 
-<h3>ノード種別</h3>
+<h2>都市</h2>
+<div class="grid6">
+  <button onclick="setCity('涪州')">涪州</button>
+  <button onclick="setCity('桂州')">桂州</button>
+  <button onclick="setCity('永州')">永州</button>
+  <button onclick="setCity('江州')">江州</button>
+  <button onclick="setCity('光州')">光州</button>
+  <button onclick="setCity('寿州')">寿州</button>
+</div>
+
+<button style="width:100%;margin-top:6px" onclick="deleteSelected()">選択ノード削除</button>
+
+<h2>ノード種別</h2>
 <div class="grid3">
   <button onclick="setType('inn_small')">小宿</button>
   <button onclick="setType('inn_big')">大宿</button>
+  <button onclick="setType('fork')">分岐</button>
+  <button onclick="setType('merge')">合流</button>
 </div>
 
-<h3>基本設定</h3>
-<div class="field"><label>総距離</label><input id="totalDist" value="50000000"></div>
-<div class="field"><label>基本速度/秒</label><input id="baseSpeed" value="1389"></div>
-<div class="field"><label>初期ライチ数</label><input id="initLychee" value="10600000"></div>
-<div class="field"><label>ライチ減少数/秒</label><input id="loss" value="100"></div>
+<h2>基本設定</h2>
+<div class="gridFields">
+  <div class="field"><label>総距離</label><input id="totalDist" value="50000000"></div>
+  <div class="field"><label>基本速度/秒</label><input id="baseSpeed" value="1389"></div>
+  <div class="field"><label>宿駅通過加速バフ</label><input id="innBoost" value="6945"></div>
+</div>
+<div class="gridFields" style="margin-top:6px">
+  <div class="field"><label>初期ライチ数</label><input id="initLychee" value="10600000"></div>
+  <div class="field"><label>ライチ減少数/秒</label><input id="loss" value="100"></div>
+  <div class="field"><label>宿駅バフ持続時間</label><input id="innTime" value="900"></div>
+</div>
+
+<h2>都市別ルートバフ</h2>
+<div class="table">
+  <div class="cell">都市</div><div class="cell">ルートバフ</div>
+  <div class="cell">距離</div><div class="cell">速度</div><div class="cell">ライチ</div><div class="cell">宿駅</div>
+
+  <div class="cell">涪州</div><div class="cell">損失-20%</div><div class="cell">1</div><div class="cell">1</div><div class="cell">0.8</div><div class="cell">5</div>
+  <div class="cell">桂州</div><div class="cell">距離-5%</div><div class="cell">0.95</div><div class="cell">1</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">永州</div><div class="cell">防御+20%</div><div class="cell">1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">江州</div><div class="cell">速度+8%</div><div class="cell">1</div><div class="cell">1.08</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">光州</div><div class="cell">強奪損失-20%</div><div class="cell">1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">寿州</div><div class="cell">宿駅+1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">6</div>
+</div>
+
+<h2>結果（進行中）</h2>
+<div class="result">
+  <div class="cell">位</div><div class="cell">都市</div><div class="cell">ライチ</div>
+  <div class="cell">速度</div><div class="cell">残距離</div><div class="cell">時間</div>
+</div>
+<div id="result" class="result"></div>
 
 </div>
 
@@ -106,94 +182,130 @@ const colors={
   江州:'#6ba8ff',光州:'#ff6bf0',寿州:'#6bfff5'
 };
 
-let nodes=[];
-let currentType=null;
-let selectedCities=[];
+let nodes=[],currentType=null,currentCity=null;
+let selected=null,drag=null;
+let simRunning=false,simStart=0,simState={};
 
-/* ---- city buttons ---- */
-const cityBox=document.getElementById('cityButtons');
-cities.forEach(c=>{
-  const b=document.createElement('button');
-  b.textContent=c;
-  b.onclick=()=>toggleCity(c);
-  cityBox.appendChild(b);
-});
+function setType(t){currentType=t}
+function setCity(c){currentCity=c}
 
-function toggleCity(city){
-  const singleOnly = (currentType==='start'||currentType==='goal');
-  if(singleOnly){
-    selectedCities=[city];
-  }else{
-    if(selectedCities.includes(city)){
-      selectedCities=selectedCities.filter(c=>c!==city);
-    }else if(selectedCities.length<2){
-      selectedCities.push(city);
-    }
+function addNode(x,y){
+  if(!currentType||!currentCity) return;
+  nodes.push({x,y,type:currentType,city:currentCity});
+}
+
+function deleteSelected(){
+  if(!selected) return;
+  nodes=nodes.filter(n=>n!==selected);
+  selected=null;
+}
+
+function routePx(city){
+  const path=nodes.filter(n=>n.city===city);
+  let px=0;
+  for(let i=0;i<path.length-1;i++){
+    px+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
   }
-  refreshCityButtons();
+  return px;
 }
 
-function refreshCityButtons(){
-  [...cityBox.children].forEach(b=>{
-    if(selectedCities.includes(b.textContent)){
-      b.classList.add('active');
-      b.style.background=colors[b.textContent];
-      b.style.color='#000';
-    }else{
-      b.classList.remove('active');
-      b.style.background='';
-      b.style.color='';
-    }
+function runSim(){
+  simState={};
+  simRunning=true;
+  simStart=performance.now();
+  const totalPx=cities.reduce((s,c)=>s+routePx(c),0)||1;
+
+  cities.forEach(city=>{
+    const px=routePx(city);
+    const dist=px/totalPx*(+totalDist.value);
+    simState[city]={
+      time:0,
+      lychee:+initLychee.value,
+      speed:+baseSpeed.value,
+      remainDist:dist
+    };
   });
 }
 
-/* ---- node type ---- */
-function setType(t){
-  currentType=t;
-  selectedCities=[];
-  document.querySelectorAll('.grid3 button').forEach(b=>b.classList.remove('active'));
-  event.target.classList.add('active');
-  refreshCityButtons();
+function resetSim(){
+  simRunning=false;
+  simState={};
 }
 
-/* ---- add node ---- */
-canvas.onmousedown=e=>{
-  if(!currentType||selectedCities.length===0) return;
-  const r=canvas.getBoundingClientRect();
-  nodes.push({
-    x:e.clientX-r.left,
-    y:e.clientY-r.top,
-    type:currentType,
-    cities:[...selectedCities]
-  });
-};
+function updateSim(){
+  if(!simRunning) return;
+  const now=performance.now();
+  const dt=(now-simStart)/1000;
+  simStart=now;
 
-/* ---- draw ---- */
+  cities.forEach(c=>{
+    const s=simState[c];
+    if(!s||s.remainDist<=0||s.lychee<=0) return;
+    s.remainDist=Math.max(0,s.remainDist-s.speed*dt);
+    s.time+=dt;
+    s.lychee=Math.max(0,s.lychee-(+loss.value)*dt);
+  });
+}
+
+function drawResult(){
+  const r=document.getElementById('result');
+  r.innerHTML='';
+  const rank=cities.slice().sort((a,b)=>simState[a].remainDist-simState[b].remainDist);
+  rank.forEach((c,i)=>{
+    const s=simState[c];
+    if(!s) return;
+    const rate=s.lychee/(+initLychee.value);
+    r.innerHTML+=`
+      <div class="cell">${i+1}</div>
+      <div class="cell" style="color:${colors[c]}">${c}</div>
+      <div class="cell">
+        ${Math.floor(s.lychee).toLocaleString()}
+        <div class="bar"><span style="width:${rate*100}%;background:${colors[c]}"></span></div>
+      </div>
+      <div class="cell">${s.speed.toFixed(0)}</div>
+      <div class="cell">${Math.ceil(s.remainDist).toLocaleString()}</div>
+      <div class="cell">${s.time.toFixed(0)}</div>
+    `;
+  });
+}
+
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   if(bg.complete) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
 
   nodes.forEach(n=>{
-    if(n.cities.length===1){
-      ctx.fillStyle=colors[n.cities[0]];
-      ctx.beginPath();
-      ctx.arc(n.x,n.y,8,0,Math.PI*2);
-      ctx.fill();
-    }else{
-      ctx.lineWidth=4;
-      ctx.strokeStyle=colors[n.cities[0]];
-      ctx.beginPath();
-      ctx.arc(n.x,n.y,10,0,Math.PI);
-      ctx.stroke();
-      ctx.strokeStyle=colors[n.cities[1]];
-      ctx.beginPath();
-      ctx.arc(n.x,n.y,10,Math.PI,Math.PI*2);
-      ctx.stroke();
+    ctx.fillStyle=colors[n.city];
+    ctx.beginPath();ctx.arc(n.x,n.y,8,0,Math.PI*2);ctx.fill();
+    if(n.type==='start'){
+      ctx.fillStyle='#fff';
+      ctx.font='12px system-ui';
+      ctx.fillText(n.city,n.x+10,n.y-10);
     }
   });
 
+  updateSim();
+  if(simRunning) drawResult();
   requestAnimationFrame(draw);
 }
+
+canvas.onmousedown=e=>{
+  if(simRunning) return;
+  const r=canvas.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  selected=null;
+  for(const n of nodes){
+    if(Math.hypot(n.x-x,n.y-y)<10){selected=n;drag=n;return;}
+  }
+  addNode(x,y);
+};
+canvas.onmousemove=e=>{
+  if(drag&&!simRunning){
+    const r=canvas.getBoundingClientRect();
+    drag.x=e.clientX-r.left;drag.y=e.clientY-r.top;
+  }
+};
+canvas.onmouseup=()=>drag=null;
+
 draw();
 </script>
 </body>
