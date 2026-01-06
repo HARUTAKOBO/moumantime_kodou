@@ -13,15 +13,13 @@
 <!-- ===== 左パネル ===== -->
 <div class="panel">
 
-<div class="grid3">
-<button class="type-btn" onclick="setType('start')">スタート</button>
-<button class="type-btn" onclick="setType('goal')">ゴール</button>
-<button onclick="runSim()">▶ シミュレーション</button>
-</div>
-
+  <div class="grid3">
+  <button class="type-btn" onclick="setType('start')">スタート</button>
+  <button class="type-btn" onclick="setType('goal')">ゴール</button>
+  <button onclick="runSim()">▶ シミュレーション</button>
+  </div>
+  
   <button style="width:100%;margin-top:6px" onclick="resetSim()">リセット</button>
-  <button class="type-btn" onclick="setType('inn_small')">小宿</button>
-  <button class="type-btn" onclick="setType('inn_big')">大宿</button>
 
 <h2>都市</h2>
 <div class="grid6">
@@ -37,10 +35,8 @@
 
 <h2>ノード種別</h2>
 <div class="grid3">
-  <button onclick="setType('inn_small')">小宿</button>
-  <button onclick="setType('inn_big')">大宿</button>
-  <button onclick="setType('fork')">分岐</button>
-  <button onclick="setType('merge')">合流</button>
+  <button class="type-btn" onclick="setType('inn_small')">小宿</button>
+  <button class="type-btn" onclick="setType('inn_big')">大宿</button>
 </div>
 
 <h2>基本設定</h2>
