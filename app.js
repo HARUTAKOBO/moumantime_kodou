@@ -1,4 +1,3 @@
-<script>
 const canvas=document.getElementById('field');
 const ctx=canvas.getContext('2d');
 const bg=new Image(); bg.src='map.png';
@@ -134,4 +133,3 @@ canvas.onmousemove=e=>{
 canvas.onmouseup=()=>drag=null;
 
 draw();
-</script>
