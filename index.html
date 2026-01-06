@@ -2,190 +2,150 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 シミュレーター（配置→実行）</title>
+<title>ライチ争奪戦 完成版シミュレーター</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
 h1{font-size:16px;margin:8px}
-.wrap{display:grid;grid-template-columns:320px 1fr;height:100vh}
+.wrap{display:grid;grid-template-columns:360px 1fr;height:100vh}
 .panel{background:#222;padding:12px;overflow:auto}
-button{width:100%;margin:4px 0;padding:6px}
+button,input{width:100%;margin:4px 0;padding:6px}
 label{font-size:12px;color:#ccc}
 canvas{background:#000;touch-action:none}
 hr{border:0;border-top:1px solid #444;margin:8px 0}
+.table{font-size:12px}
+.table div{display:flex;justify-content:space-between}
+.bar{height:6px;background:#444;margin:2px 0}
+.bar span{display:block;height:100%}
 </style>
 </head>
 <body>
-<h1>🐎 ライチ争奪戦｜配置→6チーム同時シミュレーション</h1>
+<h1>🐎 ライチ争奪戦｜完成版シミュレーター</h1>
 <div class="wrap">
 <div class="panel">
-<strong>ノード追加</strong>
-<div style="margin-bottom:6px">現在の配置モード：<span id="placeMode">なし</span></div>
-<button onclick="setPlaceMode('start')">📍 スタートを連続配置</button>
-<button onclick="setPlaceMode('inn_small')">📍 小宿を連続配置</button>
-<button onclick="setPlaceMode('inn_big')">📍 大宿を連続配置</button>
-<button onclick="setPlaceMode('fork')">📍 分岐を連続配置</button>
-<button onclick="setPlaceMode('merge')">📍 合流を連続配置</button>
-<button onclick="setPlaceMode('goal')">📍 ゴールを連続配置</button>
-<button onclick="clearPlaceMode()">⛔ 配置モード解除</button>
+<strong>全体設定</strong>
+<label>総距離</label><input id="totalDist" type="number" value="50000000">
+<label>初期ライチ</label><input id="initLychee" type="number" value="10600000">
+<label>ライチ減少/秒</label><input id="lycheeLoss" type="number" value="100">
+<label>基本速度(px/step)</label><input id="baseSpeed" type="number" value="1">
+<hr>
+<strong>ルート距離設定</strong>
+<div id="routeInputs"></div>
 <hr>
 <button onclick="startSim()">▶ シミュレーション開始</button>
 <button onclick="resetSim()">🔄 リセット</button>
 <hr>
-<label>時間倍率</label>
-<input id="scale" type="number" value="5">
+<strong>距離（自動計算）</strong>
+<div id="distInfo" class="table"></div>
 <hr>
-<strong>選択ノード</strong><br>
-<span id="sel">なし</span>
-<div id="nodeOptions"></div>
+<strong>ライチゲージ</strong>
+<div id="lycheeBars"></div>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
 <script>
-// ===== 共通 =====
+// ===== 基本 =====
 const canvas=document.getElementById('field');
 const ctx=canvas.getContext('2d');
 const bg=new Image(); bg.src='map.png';
-const scaleEl=document.getElementById('scale');
 const teams=['桂州','寿州','江州','涪州','永州','光州'];
-let nodes=[]; let selected=null; let drag=null;
-let placeMode=null; // 連続配置モード
-let horses=[]; let running=false;
-
-function addNode(type,x=450,y=600){
-  nodes.push({id:Date.now()+Math.random(),x,y,type,teams:[...teams]});
-}
-
-function setPlaceMode(type){
-  placeMode = type;
-  document.getElementById('placeMode').textContent = type;
-}
-
-function clearPlaceMode(){
-  placeMode = null;
-  document.getElementById('placeMode').textContent = 'なし';
-}
-
-function resetSim(){ running=false; horses=[]; }
-
-function startSim(){
-  // 各チーム用に、通過ノードを意味順＋Y順で抽出
-  horses = teams.map(t=>{
-    const path = nodes
-      .filter(n=>n.teams.includes(t))
-      .sort((a,b)=>{
-        if(a.type==='start') return -1;
-        if(b.type==='start') return 1;
-        if(a.type==='goal') return 1;
-        if(b.type==='goal') return -1;
-        return b.y - a.y;
-      });
-    return {
-      team:t,
-      color:colors[t],
-      path,
-      idx:0,
-      t:0,
-      x:path[0]?.x||0,
-      y:path[0]?.y||0,
-      speed:1
-    };
-  });
-  running=true;
-}
-
 const colors={桂州:'#ff4d4d',寿州:'#4dff4d',江州:'#4d4dff',涪州:'#ffd24d',永州:'#ff4dff',光州:'#4dffff'};
 
-function draw(){
-  ctx.fillStyle='#203040'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  if(bg.complete && bg.naturalWidth>0) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+let nodes=[]; // 既存エディタで配置済み前提
+let horses=[]; let running=false; let lastTime=null;
 
-  // ノード表示
-  nodes.forEach(n=>{
-    let c='#fff';
-    if(n.type==='start')c='#0f0';
-    if(n.type==='goal')c='#f00';
-    if(n.type==='inn_small')c='#aaa';
-    if(n.type==='inn_big')c='#ffd700';
-    if(n.type==='fork')c='#0ff';
-    if(n.type==='merge')c='#f0f';
-    ctx.fillStyle=n===selected?'#0ff':c;
-    ctx.beginPath(); ctx.arc(n.x,n.y,8,0,Math.PI*2); ctx.fill();
+// ===== ルート距離UI =====
+const routeInputs=document.getElementById('routeInputs');
+const routeDist={};
+teams.forEach(t=>{
+  routeDist[t]=50000000;
+  const d=document.createElement('div');
+  d.innerHTML=`<label>${t}</label><input type="number" value="${routeDist[t]}" onchange="routeDist['${t}']=Number(this.value)">`;
+  routeInputs.appendChild(d);
+});
+
+// ===== 距離計算 =====
+function calcRouteDistance(team){
+  const path=nodes.filter(n=>n.teams?.includes(team)).sort((a,b)=>{
+    if(a.type==='start')return-1;if(b.type==='start')return 1;
+    if(a.type==='goal')return 1;if(b.type==='goal')return -1;
+    return b.y-a.y;
   });
-
-  // シミュレーション
-  if(running){
-    horses.forEach(h=>{
-      if(h.idx>=h.path.length-1) return;
-      const from=h.path[h.idx]; const to=h.path[h.idx+1];
-      const dx=to.x-from.x, dy=to.y-from.y;
-      const dist=Math.hypot(dx,dy)||1;
-      h.t += h.speed*Number(scaleEl.value)/dist;
-      if(h.t>=1){ h.idx++; h.t=0; if(to.type.includes('inn')) h.speed=3; }
-      h.x=from.x+dx*h.t; h.y=from.y+dy*h.t;
-      ctx.fillStyle=colors[h.team];
-      ctx.beginPath(); ctx.arc(h.x,h.y,10,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#000'; ctx.fillText(h.team,h.x+12,h.y);
-    });
+  let d=0;
+  for(let i=0;i<path.length-1;i++){
+    d+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
   }
+  return d;
+}
 
+function updateDistInfo(){
+  const box=document.getElementById('distInfo');box.innerHTML='';
+  teams.forEach(t=>{
+    const v=calcRouteDistance(t).toFixed(1);
+    const r=document.createElement('div');r.innerHTML=`<span>${t}</span><span>${v}</span>`;
+    box.appendChild(r);
+  });
+}
+
+// ===== シミュレーション =====
+function startSim(){
+  const baseSpeed=Number(document.getElementById('baseSpeed').value);
+  const totalDist=Number(document.getElementById('totalDist').value);
+  const initLychee=Number(document.getElementById('initLychee').value);
+  const loss=Number(document.getElementById('lycheeLoss').value);
+
+  horses=teams.map(t=>{
+    const path=nodes.filter(n=>n.teams?.includes(t)).sort((a,b)=>{
+      if(a.type==='start')return-1;if(b.type==='start')return 1;
+      if(a.type==='goal')return 1;if(b.type==='goal')return -1;
+      return b.y-a.y;
+    });
+    const pxDist=calcRouteDistance(t)||1;
+    const scale=routeDist[t]/pxDist;
+    return {team:t,color:colors[t],path,idx:0,prog:0,speed:baseSpeed*scale,lychee:initLychee,loss};
+  });
+  running=true; lastTime=performance.now();
+}
+
+function resetSim(){running=false;horses=[];lastTime=null;}
+
+function draw(now){
+  ctx.fillStyle='#203040';ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(bg.complete)ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+
+  updateDistInfo();
+
+  if(running&&lastTime){
+    const dt=(now-lastTime)/1000; lastTime=now;
+    horses.forEach(h=>{
+      if(h.idx>=h.path.length-1)return;
+      h.lychee=Math.max(0,h.lychee-dt*h.loss);
+      const a=h.path[h.idx],b=h.path[h.idx+1];
+      const seg=Math.hypot(b.x-a.x,b.y-a.y)||1;
+      h.prog+=h.speed*dt/seg;
+      if(h.prog>=1){h.idx++;h.prog=0;if(b.type?.includes('inn'))h.speed*=5;}
+      h.x=a.x+(b.x-a.x)*h.prog;h.y=a.y+(b.y-a.y)*h.prog;
+      ctx.fillStyle=h.color;ctx.beginPath();ctx.arc(h.x,h.y,10,0,Math.PI*2);ctx.fill();
+    });
+    drawLychee();
+  }
   requestAnimationFrame(draw);
 }
 
-// ===== 操作 =====
-function getPos(e){
-  const r=canvas.getBoundingClientRect();
-  const t=e.touches?e.touches[0]:e;
-  return {x:t.clientX-r.left,y:t.clientY-r.top};
-}
-
-canvas.onmousedown=e=>{
-  const m=getPos(e);
-  selected=null;
-
-  // 連続配置モードならクリックでノード追加
-  if(placeMode){
-    addNode(placeMode,m.x,m.y);
-    return;
-  }
-
-  // 通常選択・ドラッグ
-  for(const n of nodes){
-    if(Math.hypot(n.x-m.x,n.y-m.y)<10){
-      selected=n;drag=n;break;
-    }
-  }
-  updatePanel();
-}
-
-canvas.onmousemove=e=>{
-  if(drag){
-    const m=getPos(e);
-    drag.x=m.x; drag.y=m.y;
-  }
-}
-
-canvas.onmouseup=()=>drag=null;
-
-function updatePanel(){
-  const sel=document.getElementById('sel');
-  const opt=document.getElementById('nodeOptions');
-  sel.textContent=selected?selected.type:'なし';
-  opt.innerHTML='';
-  if(!selected) return;
-  teams.forEach(t=>{
-    const c=document.createElement('input');
-    c.type='checkbox';
-    c.checked=selected.teams.includes(t);
-    c.onchange=()=>{
-      if(c.checked && !selected.teams.includes(t)) selected.teams.push(t);
-      if(!c.checked) selected.teams=selected.teams.filter(x=>x!==t);
-    };
-    opt.append(c,' ',t,document.createElement('br'));
+function drawLychee(){
+  const box=document.getElementById('lycheeBars');box.innerHTML='';
+  const max=Number(document.getElementById('initLychee').value);
+  horses.forEach(h=>{
+    const d=document.createElement('div');
+    const bar=document.createElement('div');bar.className='bar';
+    const span=document.createElement('span');span.style.width=(h.lychee/max*100)+'%';span.style.background=h.color;
+    bar.appendChild(span);
+    d.innerHTML=`<div>${h.team}: ${Math.floor(h.lychee)}</div>`;
+    d.appendChild(bar);box.appendChild(d);
   });
 }
 
-draw();
+requestAnimationFrame(draw);
 </script>
 </body>
 </html>
