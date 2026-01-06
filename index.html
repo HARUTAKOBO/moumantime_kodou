@@ -1,111 +1,144 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<title>ライチ争奪戦｜シミュレーション実行型</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<title>ライチ争奪戦｜シミュレーション可視化版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{margin:0;font-family:system-ui;background:#111;color:#fff}
-h1{font-size:16px;margin:8px}
-.wrap{display:grid;grid-template-columns:360px 1fr;height:100vh}
-.panel{background:#222;padding:10px;overflow:auto}
-button,input{width:100%;margin:3px 0;padding:6px}
-canvas{background:#000}
-hr{border:0;border-top:1px solid #444;margin:8px 0}
-
-.keypad{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:4px;
-  margin-bottom:6px;
+body{
+  margin:0;
+  background:#111;
+  color:#fff;
+  font-family:system-ui;
 }
-.active{background:#0aa !important}
+.wrap{
+  display:grid;
+  grid-template-columns:420px 1fr;
+  height:100vh;
+}
+.panel{
+  background:#222;
+  padding:10px;
+  overflow:auto;
+}
+canvas{background:#000}
 
-.small{font-size:12px;color:#ccc}
-.bar{height:6px;background:#444}
+h2{font-size:14px;margin:8px 0 4px}
+
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+
+button,input{
+  background:#333;
+  color:#fff;
+  border:1px solid #555;
+  padding:6px;
+}
+input{text-align:right}
+
+.result{
+  display:grid;
+  grid-template-columns:40px 60px 1fr 60px 80px 60px;
+  gap:4px;
+  font-size:12px;
+}
+.cell{
+  background:#333;
+  padding:4px;
+  text-align:center;
+}
+.bar{
+  height:6px;
+  background:#444;
+  margin-top:2px;
+}
 .bar span{display:block;height:100%}
 </style>
 </head>
 
 <body>
-<h1>🧭 ライチ争奪戦｜シミュレーション実行型</h1>
-
 <div class="wrap">
+
+<!-- 左パネル -->
 <div class="panel">
 
-<strong>共通ノード</strong>
-<div class="keypad">
-  <button onclick="setType('start')">START</button>
-  <button onclick="setType('goal')">GOAL</button>
+<div class="grid3">
+  <button onclick="setType('start')">スタート</button>
+  <button onclick="setType('goal')">ゴール</button>
+  <button onclick="runSim()">シミュレーション</button>
 </div>
 
-<hr>
+<button style="width:100%;margin-top:4px" onclick="resetSim()">リセット</button>
 
-<strong>ノード種別</strong>
-<div class="keypad">
+<h2>都市</h2>
+<div class="grid6">
+  <button onclick="setCity('涪州')">涪州</button>
+  <button onclick="setCity('桂州')">桂州</button>
+  <button onclick="setCity('永州')">永州</button>
+  <button onclick="setCity('江州')">江州</button>
+  <button onclick="setCity('光州')">光州</button>
+  <button onclick="setCity('寿州')">寿州</button>
+</div>
+
+<button style="width:100%;margin-top:4px" onclick="deleteSelected()">選択ノード削除</button>
+
+<h2>ノード種別</h2>
+<div class="grid3">
   <button onclick="setType('inn_small')">小宿</button>
   <button onclick="setType('inn_big')">大宿</button>
   <button onclick="setType('fork')">分岐</button>
   <button onclick="setType('merge')">合流</button>
 </div>
 
-<strong>都市選択</strong>
-<div class="keypad">
-  <button onclick="setCity('桂州')">桂州</button>
-  <button onclick="setCity('寿州')">寿州</button>
-  <button onclick="setCity('江州')">江州</button>
-  <button onclick="setCity('涪州')">涪州</button>
-  <button onclick="setCity('永州')">永州</button>
-  <button onclick="setCity('光州')">光州</button>
+<h2>基本設定</h2>
+<div class="grid3">
+  <input id="totalDist" value="50000000">
+  <input id="baseSpeed" value="1389">
+  <input id="loss" value="100">
 </div>
 
-<hr>
-
-<strong>基本設定</strong>
-<label>総距離</label><input id="totalDist" type="number" value="50000000">
-<label>基本速度</label><input id="baseSpeed" type="number" value="1389">
-<label>初期ライチ</label><input id="initLychee" type="number" value="10600000">
-<label>ライチ減少/秒</label><input id="loss" type="number" value="100">
-
-<hr>
-
-<button onclick="runSim()">▶ シミュレーション実行</button>
-<button onclick="resetSim()">↺ リセット</button>
-<button onclick="deleteSelected()">🗑 選択ノード削除</button>
-
-<hr>
-<strong>結果</strong>
-<div id="result"></div>
+<h2>結果（シミュレーション中）</h2>
+<div class="result">
+  <div class="cell">位</div>
+  <div class="cell">都市</div>
+  <div class="cell">ライチ</div>
+  <div class="cell">速度</div>
+  <div class="cell">残距離</div>
+  <div class="cell">時間</div>
+</div>
+<div id="result" class="result"></div>
 
 </div>
 
+<!-- マップ -->
 <canvas id="field" width="900" height="1200"></canvas>
+
 </div>
 
 <script>
 const canvas=document.getElementById('field');
 const ctx=canvas.getContext('2d');
-const bg=new Image(); bg.src='map.png';
 
-const cities=['桂州','寿州','江州','涪州','永州','光州'];
-const colors={桂州:'#ff4d4d',寿州:'#4dff4d',江州:'#4d4dff',涪州:'#ffd24d',永州:'#ff4dff',光州:'#4dffff'};
+const cities=['涪州','桂州','永州','江州','光州','寿州'];
+const colors={
+  涪州:'#ff4d4d',
+  桂州:'#ffd24d',
+  永州:'#4dff4d',
+  江州:'#4d4dff',
+  光州:'#ff4dff',
+  寿州:'#4dffff'
+};
 
 let nodes=[];
-let selected=null, drag=null;
-let currentType=null, currentCity=null;
+let currentType=null,currentCity=null;
+let selected=null,drag=null;
 
-let simulated=false;
-let simResult={};
+let simRunning=false;
+let simStart=0;
+let simState={};
 
-function setType(t){ currentType=t; highlight(); }
-function setCity(c){ currentCity=c; highlight(); }
-
-function highlight(){
-  document.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('button').forEach(b=>{
-    if(b.innerText===currentType||b.innerText===currentCity) b.classList.add('active');
-  });
-}
+function setType(t){currentType=t}
+function setCity(c){currentCity=c}
 
 function addNode(x,y){
   if(!currentType||!currentCity) return;
@@ -118,105 +151,116 @@ function deleteSelected(){
   selected=null;
 }
 
-function routeNodes(city){
-  return nodes
-    .filter(n=>n.city===city||n.city==='all')
-    .sort((a,b)=>{
-      if(a.type==='start') return -1;
-      if(b.type==='start') return 1;
-      if(a.type==='goal') return 1;
-      if(b.type==='goal') return -1;
-      return a.id-b.id;
-    });
-}
-
 function calc(city){
-  const path=routeNodes(city);
-  if(path.length<2) return null;
-  let px=0;
-  for(let i=0;i<path.length-1;i++){
-    px+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
-  }
   const dist=+totalDist.value;
   const speed=+baseSpeed.value;
-  const time=dist/speed;
-  const ly0=+initLychee.value;
-  const loss=+loss.value;
-  return {time, ly:Math.max(0, ly0-time*loss)};
+  return {dist,speed,totalTime:dist/speed};
 }
 
 function runSim(){
-  simResult={};
-  cities.forEach(c=>{
-    const r=calc(c);
-    if(r) simResult[c]=r;
+  simState={};
+  simRunning=true;
+  simStart=performance.now();
+  cities.forEach(city=>{
+    const r=calc(city);
+    simState[city]={
+      time:0,
+      lychee:10600000,
+      speed:r.speed,
+      remainDist:r.dist,
+      totalTime:r.totalTime
+    };
   });
-  simulated=true;
 }
 
 function resetSim(){
-  simulated=false;
-  simResult={};
-  document.getElementById('result').innerHTML='';
+  simRunning=false;
+  simState={};
+}
+
+function updateSim(){
+  if(!simRunning) return;
+  const now=performance.now();
+  const dt=(now-simStart)/1000;
+  simStart=now;
+
+  cities.forEach(city=>{
+    const s=simState[city];
+    if(!s||s.remainDist<=0||s.lychee<=0) return;
+    s.remainDist=Math.max(0,s.remainDist-s.speed*dt);
+    s.time+=dt;
+    s.lychee=Math.max(0,s.lychee-(+loss.value)*dt);
+  });
+}
+
+function getRanking(){
+  return cities.slice().sort((a,b)=>{
+    return simState[a].remainDist-simState[b].remainDist;
+  });
 }
 
 function drawResult(){
-  if(!simulated) return;
   const r=document.getElementById('result');
   r.innerHTML='';
-  const ly0=+initLychee.value;
-
-  cities.forEach(c=>{
-    const v=simResult[c];
-    if(!v) return;
-    const d=document.createElement('div');
-    d.innerHTML=`
-      <div class="small">${c} ${v.time.toFixed(0)}秒 / ${Math.floor(v.ly)}</div>
-      <div class="bar">
-        <span style="width:${v.ly/ly0*100}%;background:${colors[c]}"></span>
-      </div>`;
-    r.appendChild(d);
+  const rank=getRanking();
+  rank.forEach((city,i)=>{
+    const s=simState[city];
+    if(!s) return;
+    const rate=s.lychee/10600000;
+    const row=document.createElement('div');
+    row.innerHTML=`
+      <div class="cell">${i+1}</div>
+      <div class="cell" style="color:${colors[city]}">${city}</div>
+      <div class="cell">
+        ${Math.floor(s.lychee).toLocaleString()}
+        <div class="bar"><span style="width:${rate*100}%;background:${colors[city]}"></span></div>
+      </div>
+      <div class="cell">${s.speed.toFixed(0)}</div>
+      <div class="cell">${Math.ceil(s.remainDist).toLocaleString()}</div>
+      <div class="cell">${s.time.toFixed(0)}</div>
+    `;
+    r.appendChild(row);
   });
 }
 
 function draw(){
-  ctx.fillStyle='#203040';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  if(bg.complete) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
   nodes.forEach(n=>{
-    let c=colors[n.city]||'#fff';
-    if(n.type==='start') c='#0f0';
-    if(n.type==='goal') c='#f00';
-    ctx.fillStyle=n===selected?'#0ff':c;
+    ctx.fillStyle=colors[n.city];
     ctx.beginPath();
     ctx.arc(n.x,n.y,8,0,Math.PI*2);
     ctx.fill();
+
+    if(n.type==='start'){
+      ctx.fillStyle='#fff';
+      ctx.font='12px sans-serif';
+      ctx.fillText(n.city,n.x+10,n.y-10);
+    }
   });
 
+  updateSim();
   drawResult();
   requestAnimationFrame(draw);
 }
 
 function pos(e){
   const r=canvas.getBoundingClientRect();
-  return {x:e.clientX-r.left,y:e.clientY-r.top};
+  return{x:e.clientX-r.left,y:e.clientY-r.top};
 }
 
 canvas.onmousedown=e=>{
   const m=pos(e);
   selected=null;
   for(const n of nodes){
-    if(Math.hypot(n.x-m.x,n.y-m.y)<10){
-      selected=n; drag=n; return;
-    }
+    if(Math.hypot(n.x-m.x,n.y-m.y)<10){selected=n;drag=n;return;}
   }
-  if(!simulated) addNode(m.x,m.y);
+  if(!simRunning) addNode(m.x,m.y);
 };
 canvas.onmousemove=e=>{
-  if(drag&&!simulated){
+  if(drag&&!simRunning){
     const m=pos(e);
-    drag.x=m.x; drag.y=m.y;
+    drag.x=m.x;drag.y=m.y;
   }
 };
 canvas.onmouseup=()=>drag=null;
