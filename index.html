@@ -2,158 +2,96 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 最終版（ノード調整対応）</title>
+<title>ライチ争奪戦 ルート配置エディタ</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
 h1{font-size:16px;margin:8px}
-.wrap{display:grid;grid-template-columns:260px 1fr;height:100vh}
+.wrap{display:grid;grid-template-columns:280px 1fr;height:100vh}
 .panel{background:#222;padding:12px;overflow:auto}
+button{width:100%;margin:4px 0;padding:6px}
 label{font-size:12px;color:#ccc}
-input,button{width:100%;margin:6px 0;padding:6px}
 canvas{background:#000;touch-action:none}
+.node{font-size:12px}
 </style>
 </head>
 <body>
-<h1>🐎 ライチ争奪戦・最終シミュレーター（ノード移動対応）</h1>
+<h1>🧭 ライチ争奪戦｜ルート配置エディタ（STEP A）</h1>
 <div class="wrap">
 <div class="panel">
-<label>時間圧縮</label>
-<input id="scale" type="number" value="5">
-<label>マップ透明度</label>
-<input id="alpha" type="number" step="0.1" min="0" max="1" value="0.6">
-<button id="reset">リセット</button>
-<p style="font-size:12px;line-height:1.4">
-・白丸（宿舎/分岐）をドラッグして調整可能<br>
-・6色＝6チーム最終形<br>
-</p>
+<button id="addInn">➕ 宿舎ノード追加</button>
+<button id="addFork">➕ 分岐ノード追加</button>
+<button id="addGoal">➕ ゴールノード追加</button>
+<hr>
+<label>選択ノード：<span id="sel">なし</span></label>
+<div id="routeChecks"></div>
+<hr>
+<button id="export">📄 JSON書き出し</button>
+<p style="font-size:12px">※ map.png を背景に配置できます</p>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
 <script>
-// ===== 最終版 =====
-const canvas = document.getElementById('field');
-const ctx = canvas.getContext('2d');
-const scaleEl = document.getElementById('scale');
-const alphaEl = document.getElementById('alpha');
+const canvas=document.getElementById('field');
+const ctx=canvas.getContext('2d');
 
-const bg = new Image();
-bg.src = 'map.png';
+const bg=new Image();bg.src='map.png';
 
-// ノード（すべてドラッグ可能）
-const nodes = {
-  start:{x:450,y:1030,type:'start'},
-  a:{x:430,y:900,type:'inn'},
-  b:{x:470,y:820,type:'inn'},
-  c:{x:430,y:720,type:'inn'},
-  fork:{x:480,y:660,type:'fork'},
-  d1:{x:420,y:580,type:'inn'},
-  d2:{x:540,y:580,type:'inn'},
-  merge:{x:480,y:500,type:'merge'},
-  e:{x:480,y:420,type:'inn'},
-  goal:{x:460,y:220,type:'goal'}
-};
+const teams=['桂州','寿州','江州','涪州','永州','光州'];
+let nodes=[];
+let selected=null;
+let drag=null;
 
-const innNodes = Object.keys(nodes).filter(k=>nodes[k].type==='inn');
-
-const routes = [
-  {name:'桂州', color:'#ff4d4d', path:['start','a','b','c','fork','d1','merge','e','goal']},
-  {name:'寿州', color:'#4dff4d', path:['start','a','b','c','fork','d2','merge','e','goal']},
-  {name:'江州', color:'#4d4dff', path:['start','a','b','c','fork','d2','merge','e','goal']},
-  {name:'涪州', color:'#ffd24d', path:['start','a','b','c','fork','d1','merge','e','goal']},
-  {name:'永州', color:'#ff4dff', path:['start','a','b','c','fork','d1','merge','e','goal']},
-  {name:'光州', color:'#4dffff', path:['start','a','b','c','fork','d2','merge','e','goal']}
-];
-
-let horses=[];
-let dragNode=null;
-
-function resetSim(){
-  horses = routes.map(r=>({
-    route:r, seg:0, t:0, buff:0,
-    pos:{...nodes[r.path[0]]}
-  }));
+function addNode(type){
+  nodes.push({id:Date.now()+Math.random(),x:450,y:600,type,teams:[...teams]});
 }
-
-// ===== ノードドラッグ =====
-function getMousePos(e){
-  const r = canvas.getBoundingClientRect();
-  const x = (e.touches?e.touches[0].clientX:e.clientX)-r.left;
-  const y = (e.touches?e.touches[0].clientY:e.clientY)-r.top;
-  return {x,y};
-}
-
-canvas.addEventListener('mousedown',e=>{
-  const m=getMousePos(e);
-  for(const k in nodes){
-    const n=nodes[k];
-    if(Math.hypot(n.x-m.x,n.y-m.y)<12){ dragNode=n; break; }
-  }
-});
-canvas.addEventListener('mousemove',e=>{
-  if(!dragNode) return;
-  const m=getMousePos(e);
-  dragNode.x=m.x; dragNode.y=m.y;
-});
-canvas.addEventListener('mouseup',()=>dragNode=null);
-canvas.addEventListener('mouseleave',()=>dragNode=null);
-
-// touch
-canvas.addEventListener('touchstart',e=>{
-  const m=getMousePos(e);
-  for(const k in nodes){
-    const n=nodes[k];
-    if(Math.hypot(n.x-m.x,n.y-m.y)<12){ dragNode=n; break; }
-  }
-});
-canvas.addEventListener('touchmove',e=>{
-  if(!dragNode) return;
-  const m=getMousePos(e);
-  dragNode.x=m.x; dragNode.y=m.y;
-  e.preventDefault();
-});
-canvas.addEventListener('touchend',()=>dragNode=null);
 
 function draw(){
-  ctx.fillStyle='#203040';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  if(bg.complete && bg.naturalWidth>0){
-    ctx.save();
-    ctx.globalAlpha=Number(alphaEl.value);
-    ctx.drawImage(bg,0,0,canvas.width,canvas.height);
-    ctx.restore();
-  }
-
-  // ノード表示
-  for(const k in nodes){
-    const n=nodes[k];
-    ctx.strokeStyle='#fff';
-    ctx.beginPath(); ctx.arc(n.x,n.y,8,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle='#fff'; ctx.fillText(k,n.x+10,n.y);
-  }
-
-  // 馬
-  horses.forEach(h=>{
-    if(h.seg>=h.route.path.length-1) return;
-    const from=nodes[h.route.path[h.seg]];
-    const to=nodes[h.route.path[h.seg+1]];
-    const dx=to.x-from.x, dy=to.y-from.y;
-    const dist=Math.hypot(dx,dy)||1;
-    let v=0.5; if(h.buff>0){v=2;h.buff--;}
-    h.t+=v*Number(scaleEl.value)/dist;
-    if(h.t>=1){ h.seg++; h.t=0; if(innNodes.includes(h.route.path[h.seg])) h.buff=300; }
-    h.pos.x=from.x+dx*h.t; h.pos.y=from.y+dy*h.t;
-    ctx.fillStyle=h.route.color;
-    ctx.beginPath(); ctx.arc(h.pos.x,h.pos.y,10,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#000'; ctx.fillText(h.route.name,h.pos.x+12,h.pos.y);
+  ctx.fillStyle='#203040';ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(bg.complete)ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+  nodes.forEach(n=>{
+    ctx.fillStyle=n===selected?'#0ff':'#fff';
+    ctx.beginPath();ctx.arc(n.x,n.y,10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#000';ctx.fillText(n.type,n.x+12,n.y);
   });
-
   requestAnimationFrame(draw);
 }
 
-resetSim(); requestAnimationFrame(draw);
-document.getElementById('reset').onclick=resetSim;
+function mousePos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+canvas.onmousedown=e=>{
+  const m=mousePos(e);
+  selected=null;
+  for(const n of nodes){if(Math.hypot(n.x-m.x,n.y-m.y)<12){selected=n;drag=n;break}}
+  updatePanel();
+}
+canvas.onmousemove=e=>{if(drag){const m=mousePos(e);drag.x=m.x;drag.y=m.y}}
+canvas.onmouseup=()=>drag=null;
+
+function updatePanel(){
+  document.getElementById('sel').textContent=selected?selected.type:'なし';
+  const box=document.getElementById('routeChecks');box.innerHTML='';
+  if(!selected)return;
+  teams.forEach(t=>{
+    const c=document.createElement('input');c.type='checkbox';c.checked=selected.teams.includes(t);
+    c.onchange=()=>{
+      if(c.checked&&!selected.teams.includes(t))selected.teams.push(t);
+      if(!c.checked)selected.teams=selected.teams.filter(x=>x!==t);
+    }
+    const l=document.createElement('label');l.append(c,' ',t);
+    box.append(l,document.createElement('br'));
+  })
+}
+
+document.getElementById('addInn').onclick=()=>addNode('inn');
+document.getElementById('addFork').onclick=()=>addNode('fork');
+document.getElementById('addGoal').onclick=()=>addNode('goal');
+
+document.getElementById('export').onclick=()=>{
+  const data=JSON.stringify(nodes,null,2);
+  alert(data);
+}
+
+draw();
 </script>
 </body>
 </html>
