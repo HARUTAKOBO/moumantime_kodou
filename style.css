@@ -60,10 +60,18 @@ button:active{
   box-shadow:0 1px 0 #24339a;
 }
 
-/* tables */
-.table{
+/* ★ 選択状態の視認性（JSは触らない） */
+.city-btn.active,
+.type-btn.active{
+  outline:3px solid #ffd86b;
+  outline-offset:2px;
+  filter:brightness(1.2);
+}
+
+/* tables / result */
+.result{
   display:grid;
-  grid-template-columns:60px 1.5fr repeat(4,1fr);
+  grid-template-columns:40px 60px 1fr 60px 80px 60px;
   gap:4px;
   font-size:12px;
 }
@@ -73,14 +81,6 @@ button:active{
   padding:4px;
   text-align:center;
 }
-
-/* result */
-.result{
-  display:grid;
-  grid-template-columns:40px 60px 1fr 60px 80px 60px;
-  gap:4px;
-  font-size:12px;
-}
 .bar{
   height:6px;
   background:#444;
@@ -88,15 +88,3 @@ button:active{
   overflow:hidden;
 }
 .bar span{display:block;height:100%}
-
-/* ===== 追加：選択状態を分かりやすくする ===== */
-button.active{
-  outline:3px solid #ffd86b;
-  outline-offset:2px;
-  filter:brightness(1.15);
-}
-
-/* 都市ボタン専用の選択強調（色はJS側で付与） */
-.city-btn.active{
-  box-shadow:0 0 0 3px #ffd86b inset;
-}
