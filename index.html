@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 ルートシミュレーター（強制表示版）</title>
+<title>ライチ争奪戦 デバッグSTEP1（6色確認）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
@@ -15,25 +15,38 @@ canvas{background:#000}
 </style>
 </head>
 <body>
-<h1>🐎 ライチ争奪戦・必ず見えるデバッグ版</h1>
+<h1>🐎 デバッグSTEP1：6色の丸が見えるか確認</h1>
 <div class="wrap">
 <div class="panel">
-<label>時間圧縮</label>
-<input id="scale" type="number" value="5">
+<label>速度（小さくするとゆっくり）</label>
+<input id="speed" type="number" value="2">
 <button id="reset">リセット</button>
+<p style="font-size:12px;line-height:1.4">
+・6色の丸が同時に動けばOK<br>
+・まだマップは使いません
+</p>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
 <script>
-// ====== 絶対に動く最小構成 ======
+// ===== STEP1: 視覚確認専用 =====
 const canvas = document.getElementById('field');
 const ctx = canvas.getContext('2d');
-const scaleEl = document.getElementById('scale');
+const speedEl = document.getElementById('speed');
+
+const horses = [
+  {name:'桂州', color:'#ff4d4d', x:100, y:200},
+  {name:'寿州', color:'#4dff4d', x:200, y:300},
+  {name:'江州', color:'#4d4dff', x:300, y:400},
+  {name:'涪州', color:'#ffd24d', x:400, y:500},
+  {name:'永州', color:'#ff4dff', x:500, y:600},
+  {name:'光州', color:'#4dffff', x:600, y:700}
+];
 
 let t = 0;
 
 function draw(){
-  // 背景（毎フレーム必ず描画）
+  // 背景
   ctx.fillStyle = '#203040';
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
@@ -42,27 +55,26 @@ function draw(){
   for(let x=0;x<canvas.width;x+=100){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
   for(let y=0;y<canvas.height;y+=100){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
 
-  // デバッグ文字
-  ctx.fillStyle = '#fff';
-  ctx.font = '20px sans-serif';
-  ctx.fillText('Canvas 描画テスト OK',20,40);
-  ctx.fillText('もしこれが見えなければ環境問題です',20,70);
+  // 馬（6色）
+  horses.forEach((h,i)=>{
+    const dx = (t + i*50) % 600;
+    const dy = (t + i*30) % 400;
+    const x = h.x + dx;
+    const y = h.y + dy;
 
-  // 確実に動く円
-  const speed = Number(scaleEl.value);
-  const x = 100 + (t % 600);
-  const y = 200 + (t % 400);
+    ctx.fillStyle = h.color;
+    ctx.beginPath();
+    ctx.arc(x,y,12,0,Math.PI*2);
+    ctx.fill();
 
-  ctx.fillStyle = 'red';
-  ctx.beginPath();
-  ctx.arc(x,y,15,0,Math.PI*2);
-  ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.fillText(h.name, x+14, y);
+  });
 
-  t += speed;
+  t += Number(speedEl.value);
   requestAnimationFrame(draw);
 }
 
-// 起動
 requestAnimationFrame(draw);
 
 document.getElementById('reset').onclick = ()=>{t=0;};
