@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 STEP3（ルート＋分岐＋宿舎）</title>
+<title>ライチ争奪戦 最終版（ノード調整対応）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
@@ -11,11 +11,11 @@ h1{font-size:16px;margin:8px}
 .panel{background:#222;padding:12px;overflow:auto}
 label{font-size:12px;color:#ccc}
 input,button{width:100%;margin:6px 0;padding:6px}
-canvas{background:#000}
+canvas{background:#000;touch-action:none}
 </style>
 </head>
 <body>
-<h1>🐎 STEP3：ルート・分岐・宿舎つきシミュレーション</h1>
+<h1>🐎 ライチ争奪戦・最終シミュレーター（ノード移動対応）</h1>
 <div class="wrap">
 <div class="panel">
 <label>時間圧縮</label>
@@ -24,14 +24,14 @@ canvas{background:#000}
 <input id="alpha" type="number" step="0.1" min="0" max="1" value="0.6">
 <button id="reset">リセット</button>
 <p style="font-size:12px;line-height:1.4">
-・6色の丸がルートに沿って進む<br>
-・白い円＝宿舎（通過で加速）
+・白丸（宿舎/分岐）をドラッグして調整可能<br>
+・6色＝6チーム最終形<br>
 </p>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
 <script>
-// ===== STEP3 本命 =====
+// ===== 最終版 =====
 const canvas = document.getElementById('field');
 const ctx = canvas.getContext('2d');
 const scaleEl = document.getElementById('scale');
@@ -40,24 +40,22 @@ const alphaEl = document.getElementById('alpha');
 const bg = new Image();
 bg.src = 'map.png';
 
-// ノード（目視配置・後で微調整OK）
+// ノード（すべてドラッグ可能）
 const nodes = {
-  start:{x:450,y:1030},
-  a:{x:430,y:900},
-  b:{x:470,y:820},
-  c:{x:430,y:720},
-  fork:{x:480,y:660},
-  d1:{x:420,y:580},
-  d2:{x:540,y:580},
-  merge:{x:480,y:500},
-  e:{x:480,y:420},
-  goal:{x:460,y:220}
+  start:{x:450,y:1030,type:'start'},
+  a:{x:430,y:900,type:'inn'},
+  b:{x:470,y:820,type:'inn'},
+  c:{x:430,y:720,type:'inn'},
+  fork:{x:480,y:660,type:'fork'},
+  d1:{x:420,y:580,type:'inn'},
+  d2:{x:540,y:580,type:'inn'},
+  merge:{x:480,y:500,type:'merge'},
+  e:{x:480,y:420,type:'inn'},
+  goal:{x:460,y:220,type:'goal'}
 };
 
-// 宿舎ノード
-const inns = ['a','b','c','d1','d2','e'];
+const innNodes = Object.keys(nodes).filter(k=>nodes[k].type==='inn');
 
-// 6ルート
 const routes = [
   {name:'桂州', color:'#ff4d4d', path:['start','a','b','c','fork','d1','merge','e','goal']},
   {name:'寿州', color:'#4dff4d', path:['start','a','b','c','fork','d2','merge','e','goal']},
@@ -68,17 +66,53 @@ const routes = [
 ];
 
 let horses=[];
+let dragNode=null;
 
 function resetSim(){
   horses = routes.map(r=>({
-    route:r,
-    seg:0,
-    t:0,
-    speed:1,
-    buff:0,
+    route:r, seg:0, t:0, buff:0,
     pos:{...nodes[r.path[0]]}
   }));
 }
+
+// ===== ノードドラッグ =====
+function getMousePos(e){
+  const r = canvas.getBoundingClientRect();
+  const x = (e.touches?e.touches[0].clientX:e.clientX)-r.left;
+  const y = (e.touches?e.touches[0].clientY:e.clientY)-r.top;
+  return {x,y};
+}
+
+canvas.addEventListener('mousedown',e=>{
+  const m=getMousePos(e);
+  for(const k in nodes){
+    const n=nodes[k];
+    if(Math.hypot(n.x-m.x,n.y-m.y)<12){ dragNode=n; break; }
+  }
+});
+canvas.addEventListener('mousemove',e=>{
+  if(!dragNode) return;
+  const m=getMousePos(e);
+  dragNode.x=m.x; dragNode.y=m.y;
+});
+canvas.addEventListener('mouseup',()=>dragNode=null);
+canvas.addEventListener('mouseleave',()=>dragNode=null);
+
+// touch
+canvas.addEventListener('touchstart',e=>{
+  const m=getMousePos(e);
+  for(const k in nodes){
+    const n=nodes[k];
+    if(Math.hypot(n.x-m.x,n.y-m.y)<12){ dragNode=n; break; }
+  }
+});
+canvas.addEventListener('touchmove',e=>{
+  if(!dragNode) return;
+  const m=getMousePos(e);
+  dragNode.x=m.x; dragNode.y=m.y;
+  e.preventDefault();
+});
+canvas.addEventListener('touchend',()=>dragNode=null);
 
 function draw(){
   ctx.fillStyle='#203040';
@@ -86,62 +120,40 @@ function draw(){
 
   if(bg.complete && bg.naturalWidth>0){
     ctx.save();
-    ctx.globalAlpha = Number(alphaEl.value);
+    ctx.globalAlpha=Number(alphaEl.value);
     ctx.drawImage(bg,0,0,canvas.width,canvas.height);
     ctx.restore();
   }
 
-  // 宿舎表示
-  inns.forEach(k=>{
-    const n = nodes[k];
+  // ノード表示
+  for(const k in nodes){
+    const n=nodes[k];
     ctx.strokeStyle='#fff';
-    ctx.beginPath();
-    ctx.arc(n.x,n.y,8,0,Math.PI*2);
-    ctx.stroke();
-  });
+    ctx.beginPath(); ctx.arc(n.x,n.y,8,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.fillText(k,n.x+10,n.y);
+  }
 
   // 馬
   horses.forEach(h=>{
-    if(h.seg >= h.route.path.length-1) return;
-    const from = nodes[h.route.path[h.seg]];
-    const to   = nodes[h.route.path[h.seg+1]];
-    const dx = to.x-from.x;
-    const dy = to.y-from.y;
-    const dist = Math.hypot(dx,dy);
-
-    let v = 0.5;
-    if(h.buff>0){ v = 2; h.buff--; }
-
-    h.t += v * Number(scaleEl.value) / dist;
-
-    if(h.t>=1){
-      h.seg++;
-      h.t=0;
-      const nodeName = h.route.path[h.seg];
-      if(inns.includes(nodeName)){
-        h.buff = 300; // 宿舎バフ（視覚用）
-      }
-    }
-
-    h.pos.x = from.x + dx*h.t;
-    h.pos.y = from.y + dy*h.t;
-
+    if(h.seg>=h.route.path.length-1) return;
+    const from=nodes[h.route.path[h.seg]];
+    const to=nodes[h.route.path[h.seg+1]];
+    const dx=to.x-from.x, dy=to.y-from.y;
+    const dist=Math.hypot(dx,dy)||1;
+    let v=0.5; if(h.buff>0){v=2;h.buff--;}
+    h.t+=v*Number(scaleEl.value)/dist;
+    if(h.t>=1){ h.seg++; h.t=0; if(innNodes.includes(h.route.path[h.seg])) h.buff=300; }
+    h.pos.x=from.x+dx*h.t; h.pos.y=from.y+dy*h.t;
     ctx.fillStyle=h.route.color;
-    ctx.beginPath();
-    ctx.arc(h.pos.x,h.pos.y,10,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.fillStyle='#000';
-    ctx.fillText(h.route.name,h.pos.x+12,h.pos.y);
+    ctx.beginPath(); ctx.arc(h.pos.x,h.pos.y,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#000'; ctx.fillText(h.route.name,h.pos.x+12,h.pos.y);
   });
 
   requestAnimationFrame(draw);
 }
 
-resetSim();
-requestAnimationFrame(draw);
-
-document.getElementById('reset').onclick = resetSim;
+resetSim(); requestAnimationFrame(draw);
+document.getElementById('reset').onclick=resetSim;
 </script>
 </body>
 </html>
