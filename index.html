@@ -118,9 +118,23 @@ function tick(now){
   const dt = (now-last)/1000; last = now;
   const scaleV = Number(scaleEl.value);
 
+  // === 常に背景を描画（真っ黒防止）===
   ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // デバッグ用グリッド背景（必ず表示）
+  ctx.fillStyle = '#203040';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle = '#304860';
+  for(let x=0;x<canvas.width;x+=100){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+  for(let y=0;y<canvas.height;y+=100){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+
+  // 背景画像（あれば上書き）
   if(bg.complete && bg.naturalWidth>0){
+    ctx.globalAlpha = 1;
     ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.fillText('map.png が読み込めていません',20,30);
   } else {
     // 背景が読み込めない場合の仮表示
     ctx.fillStyle = '#203040';
