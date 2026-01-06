@@ -1,26 +1,35 @@
-const canvas=document.getElementById('field');
-const ctx=canvas.getContext('2d');
-const bg=new Image(); bg.src='map.jpg';
+/***** 初期設定 *****/
+const canvas = document.getElementById('field');
+const ctx = canvas.getContext('2d');
+const bg = new Image();
+bg.src = 'map.jpg';   // ← map.png / map.jpg は実ファイルに合わせる
 
-const cities=['涪州','桂州','永州','江州','光州','寿州'];
-const colors={
-  涪州:'#ff6b6b',桂州:'#ffd93d',永州:'#6bff95',
-  江州:'#6ba8ff',光州:'#ff6bf0',寿州:'#6bfff5'
+const cities = ['涪州','桂州','永州','江州','光州','寿州'];
+const colors = {
+  涪州:'#ff6b6b',
+  桂州:'#ffd93d',
+  永州:'#6bff95',
+  江州:'#6ba8ff',
+  光州:'#ff6bf0',
+  寿州:'#6bfff5'
 };
 
-let nodes=[],currentType=null,currentCity=null;
-let selected=null,drag=null;
-let simRunning=false,simStart=0,simState={};
+/***** 状態 *****/
+let nodes = [];
+let currentType = null;              // start / goal / inn_small / inn_big
+let selectedCities = [];             // 最大2都市
+let simRunning = false;
 
+/***** ノード種別選択 *****/
 function setType(t){
   currentType = t;
 
-  // ノード種別の見た目更新
-  document.querySelectorAll('.type-btn').forEach(b=>{
-    b.classList.toggle('active', b.textContent === labelOf(t));
+  // ノード種別ボタンの active 表示
+  document.querySelectorAll('.type-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.type === t);
   });
 
-  // スタート・ゴール時は都市選択不可
+  // スタート・ゴールは都市選択なし
   if(t === 'start' || t === 'goal'){
     selectedCities = [];
   }
@@ -28,132 +37,115 @@ function setType(t){
   refreshCityButtons();
 }
 
-function labelOf(t){
-  return {
-    start:'スタート',
-    goal:'ゴール',
-    inn_small:'小宿',
-    inn_big:'大宿'
-  }[t];
-}
+/***** 都市選択（最大2都市）*****/
+function toggleCity(city){
+  // スタート・ゴール中は都市選択不可
+  if(currentType === 'start' || currentType === 'goal') return;
 
-function setCity(c){currentCity=c}
-
-function addNode(x,y){
-  if(!currentType||!currentCity) return;
-  nodes.push({x,y,type:currentType,city:currentCity});
-}
-
-function deleteSelected(){
-  if(!selected) return;
-  nodes=nodes.filter(n=>n!==selected);
-  selected=null;
-}
-
-function routePx(city){
-  const path=nodes.filter(n=>n.city===city);
-  let px=0;
-  for(let i=0;i<path.length-1;i++){
-    px+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
+  if(selectedCities.includes(city)){
+    selectedCities = selectedCities.filter(c=>c!==city);
+  }else if(selectedCities.length < 2){
+    selectedCities.push(city);
   }
-  return px;
+
+  refreshCityButtons();
 }
 
-function runSim(){
-  simState={};
-  simRunning=true;
-  simStart=performance.now();
-  const totalPx=cities.reduce((s,c)=>s+routePx(c),0)||1;
-
-  cities.forEach(city=>{
-    const px=routePx(city);
-    const dist=px/totalPx*(+totalDist.value);
-    simState[city]={
-      time:0,
-      lychee:+initLychee.value,
-      speed:+baseSpeed.value,
-      remainDist:dist
-    };
-  });
-}
-
-function resetSim(){
-  simRunning=false;
-  simState={};
-}
-
-function updateSim(){
-  if(!simRunning) return;
-  const now=performance.now();
-  const dt=(now-simStart)/1000;
-  simStart=now;
-
-  cities.forEach(c=>{
-    const s=simState[c];
-    if(!s||s.remainDist<=0||s.lychee<=0) return;
-    s.remainDist=Math.max(0,s.remainDist-s.speed*dt);
-    s.time+=dt;
-    s.lychee=Math.max(0,s.lychee-(+loss.value)*dt);
-  });
-}
-
-function drawResult(){
-  const r=document.getElementById('result');
-  r.innerHTML='';
-  const rank=cities.slice().sort((a,b)=>simState[a].remainDist-simState[b].remainDist);
-  rank.forEach((c,i)=>{
-    const s=simState[c];
-    if(!s) return;
-    const rate=s.lychee/(+initLychee.value);
-    r.innerHTML+=`
-      <div class="cell">${i+1}</div>
-      <div class="cell" style="color:${colors[c]}">${c}</div>
-      <div class="cell">
-        ${Math.floor(s.lychee).toLocaleString()}
-        <div class="bar"><span style="width:${rate*100}%;background:${colors[c]}"></span></div>
-      </div>
-      <div class="cell">${s.speed.toFixed(0)}</div>
-      <div class="cell">${Math.ceil(s.remainDist).toLocaleString()}</div>
-      <div class="cell">${s.time.toFixed(0)}</div>
-    `;
-  });
-}
-
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(bg.complete) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
-
-  nodes.forEach(n=>{
-    ctx.fillStyle=colors[n.city];
-    ctx.beginPath();ctx.arc(n.x,n.y,8,0,Math.PI*2);ctx.fill();
-    if(n.type==='start'){
-      ctx.fillStyle='#fff';
-      ctx.font='12px system-ui';
-      ctx.fillText(n.city,n.x+10,n.y-10);
+function refreshCityButtons(){
+  document.querySelectorAll('.city-btn').forEach(btn=>{
+    const c = btn.textContent;
+    if(selectedCities.includes(c)){
+      btn.classList.add('active');
+      btn.style.background = colors[c];
+      btn.style.color = '#000';
+    }else{
+      btn.classList.remove('active');
+      btn.style.background = '';
+      btn.style.color = '';
     }
   });
+}
 
-  updateSim();
-  if(simRunning) drawResult();
+/***** ノード追加 *****/
+function addNode(x, y){
+  if(!currentType) return;
+
+  // 共用スタート・ゴールは1つだけ
+  if(currentType === 'start' || currentType === 'goal'){
+    nodes = nodes.filter(n => n.type !== currentType);
+    nodes.push({
+      x, y,
+      type: currentType,
+      cities: []
+    });
+    return;
+  }
+
+  // 小宿・大宿（1～2都市）
+  if(selectedCities.length === 0) return;
+
+  nodes.push({
+    x, y,
+    type: currentType,
+    cities: [...selectedCities]
+  });
+}
+
+/***** 描画 *****/
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(bg.complete){
+    ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+  }
+
+  nodes.forEach(n=>{
+    // スタート・ゴール（共用）
+    if(n.type === 'start' || n.type === 'goal'){
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,10,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 12px system-ui';
+      ctx.fillText(n.type.toUpperCase(), n.x+12, n.y-12);
+      return;
+    }
+
+    // 専用ルート
+    if(n.cities.length === 1){
+      ctx.fillStyle = colors[n.cities[0]];
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,8,0,Math.PI*2);
+      ctx.fill();
+      return;
+    }
+
+    // 共同利用ルート（2都市）
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = colors[n.cities[0]];
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,10,0,Math.PI);
+    ctx.stroke();
+
+    ctx.strokeStyle = colors[n.cities[1]];
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,10,Math.PI,Math.PI*2);
+    ctx.stroke();
+  });
+
   requestAnimationFrame(draw);
 }
 
-canvas.onmousedown=e=>{
+/***** Canvas操作 *****/
+canvas.onmousedown = e=>{
   if(simRunning) return;
-  const r=canvas.getBoundingClientRect();
-  const x=e.clientX-r.left,y=e.clientY-r.top;
-  selected=null;
-  for(const n of nodes){
-    if(Math.hypot(n.x-x,n.y-y)<10){selected=n;drag=n;return;}
-  }
-  addNode(x,y);
+  const r = canvas.getBoundingClientRect();
+  addNode(
+    e.clientX - r.left,
+    e.clientY - r.top
+  );
 };
-canvas.onmousemove=e=>{
-  if(drag&&!simRunning){
-    const r=canvas.getBoundingClientRect();
-    drag.x=e.clientX-r.left;drag.y=e.clientY-r.top;
-  }
-};
-canvas.onmouseup=()=>drag=null;
 
+/***** 起動 *****/
 draw();
