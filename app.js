@@ -20,6 +20,9 @@ let currentType = null;              // start / goal / inn_small / inn_big
 let selectedCities = [];             // 最大2都市
 let simRunning = false;
 
+/* ===== 追加：選択中ノード ===== */
+let selectedNodeIndex = null;
+
 /***** ノード種別選択 *****/
 function setType(t){
   currentType = t;
@@ -51,12 +54,10 @@ function toggleCity(city){
   refreshCityButtons();
 }
 
-/* ===== 追加：HTML互換用（削除禁止ルール対応） ===== */
-/* HTMLで setCity() が呼ばれているためラッパーを追加 */
+/* HTML互換用（既存HTML対応） */
 function setCity(city){
   toggleCity(city);
 }
-/* ===== 追加ここまで ===== */
 
 function refreshCityButtons(){
   document.querySelectorAll('.city-btn').forEach(btn=>{
@@ -94,6 +95,21 @@ function addNode(x, y){
   });
 }
 
+/***** ノード選択 *****/
+function selectNode(x, y){
+  selectedNodeIndex = null;
+
+  // 上に描画されたノードを優先
+  for(let i = nodes.length - 1; i >= 0; i--){
+    const n = nodes[i];
+    const r = (n.type === 'start' || n.type === 'goal') ? 10 : 8;
+    if(Math.hypot(n.x - x, n.y - y) <= r + 4){
+      selectedNodeIndex = i;
+      break;
+    }
+  }
+}
+
 /***** 描画 *****/
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -101,7 +117,7 @@ function draw(){
     ctx.drawImage(bg,0,0,canvas.width,canvas.height);
   }
 
-  nodes.forEach(n=>{
+  nodes.forEach((n,i)=>{
     // スタート・ゴール（共用）
     if(n.type === 'start' || n.type === 'goal'){
       ctx.fillStyle = '#ffffff';
@@ -112,29 +128,36 @@ function draw(){
       ctx.fillStyle = '#000';
       ctx.font = 'bold 12px system-ui';
       ctx.fillText(n.type.toUpperCase(), n.x+12, n.y-12);
-      return;
     }
-
     // 専用ルート
-    if(n.cities.length === 1){
+    else if(n.cities.length === 1){
       ctx.fillStyle = colors[n.cities[0]];
       ctx.beginPath();
       ctx.arc(n.x,n.y,8,0,Math.PI*2);
       ctx.fill();
-      return;
+    }
+    // 共同利用ルート（2都市）
+    else{
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = colors[n.cities[0]];
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,10,0,Math.PI);
+      ctx.stroke();
+
+      ctx.strokeStyle = colors[n.cities[1]];
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,10,Math.PI,Math.PI*2);
+      ctx.stroke();
     }
 
-    // 共同利用ルート（2都市）
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = colors[n.cities[0]];
-    ctx.beginPath();
-    ctx.arc(n.x,n.y,10,0,Math.PI);
-    ctx.stroke();
-
-    ctx.strokeStyle = colors[n.cities[1]];
-    ctx.beginPath();
-    ctx.arc(n.x,n.y,10,Math.PI,Math.PI*2);
-    ctx.stroke();
+    /* 選択中ノードの強調表示 */
+    if(i === selectedNodeIndex){
+      ctx.strokeStyle = '#ffd86b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 14, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   });
 
   requestAnimationFrame(draw);
@@ -144,19 +167,32 @@ function draw(){
 canvas.onmousedown = e=>{
   if(simRunning) return;
   const r = canvas.getBoundingClientRect();
-  addNode(
-    e.clientX - r.left,
-    e.clientY - r.top
-  );
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+
+  // Shift + クリック → 選択
+  if(e.shiftKey){
+    selectNode(x, y);
+    return;
+  }
+
+  // 通常クリック → 追加
+  addNode(x, y);
 };
 
-/* ===== 追加：HTMLに存在するが未定義だった関数 ===== */
+/***** 削除 *****/
+function deleteSelected(){
+  if(selectedNodeIndex === null) return;
+  nodes.splice(selectedNodeIndex, 1);
+  selectedNodeIndex = null;
+}
+
+/***** ダミー（既存HTML対応）*****/
 function runSim(){}
 function resetSim(){
   nodes = [];
+  selectedNodeIndex = null;
 }
-function deleteSelected(){}
-/* ===== 追加ここまで ===== */
 
 /***** 起動 *****/
 draw();
