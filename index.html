@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 ノード配置＋距離確認版</title>
+<title>ライチ争奪戦 ノード配置＋時間・ライチ計算</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
 h1{font-size:16px;margin:8px}
-.wrap{display:grid;grid-template-columns:360px 1fr;height:100vh}
+.wrap{display:grid;grid-template-columns:380px 1fr;height:100vh}
 .panel{background:#222;padding:12px;overflow:auto}
 button,input{width:100%;margin:4px 0;padding:6px}
 label{font-size:12px;color:#ccc}
@@ -15,10 +15,12 @@ canvas{background:#000;touch-action:none}
 hr{border:0;border-top:1px solid #444;margin:8px 0}
 .table{font-size:12px}
 .table div{display:flex;justify-content:space-between}
+.bar{height:6px;background:#444;margin:2px 0}
+.bar span{display:block;height:100%}
 </style>
 </head>
 <body>
-<h1>🧭 ライチ争奪戦｜ノード配置エディタ＋距離可視化</h1>
+<h1>🐎 ライチ争奪戦｜ノード配置＋時間・ライチ</h1>
 <div class="wrap">
 <div class="panel">
 <strong>ノード連続配置</strong>
@@ -31,13 +33,17 @@ hr{border:0;border-top:1px solid #444;margin:8px 0}
 <button onclick="setPlaceMode('goal')">ゴール</button>
 <button onclick="clearPlaceMode()">配置モード解除</button>
 <hr>
-<strong>距離（自動計算・px）</strong>
-<div id="distInfo" class="table"></div>
+<strong>基本設定</strong>
+<label>総距離</label><input id="totalDist" type="number" value="50000000">
+<label>基本速度（距離/秒）</label><input id="baseSpeed" type="number" value="1389">
+<label>初期ライチ</label><input id="initLychee" type="number" value="10600000">
+<label>ライチ減少/秒</label><input id="lycheeLoss" type="number" value="100">
 <hr>
-<strong>総距離（基準）</strong>
-<input id="totalDist" type="number" value="50000000">
 <strong>州別距離</strong>
 <div id="routeInputs"></div>
+<hr>
+<strong>結果（自動計算）</strong>
+<div id="result" class="table"></div>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
@@ -65,28 +71,35 @@ teams.forEach(t=>{
 
 function setPlaceMode(type){placeMode=type;document.getElementById('placeMode').textContent=type;}
 function clearPlaceMode(){placeMode=null;document.getElementById('placeMode').textContent='なし';}
-
 function addNode(type,x,y){nodes.push({id:Date.now()+Math.random(),x,y,type,teams:[...teams]});}
 
-function calcRouteDistance(team){
+function calcRoute(team){
   const path=nodes.filter(n=>n.teams.includes(team)).sort((a,b)=>{
     if(a.type==='start')return-1;if(b.type==='start')return 1;
     if(a.type==='goal')return 1;if(b.type==='goal')return -1;
     return b.y-a.y;
   });
-  let d=0;
+  let px=0;
   for(let i=0;i<path.length-1;i++){
-    d+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
+    px+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
   }
-  return d;
+  return {path,px};
 }
 
-function updateDistInfo(){
-  const box=document.getElementById('distInfo');box.innerHTML='';
+function updateResult(){
+  const box=document.getElementById('result');box.innerHTML='';
+  const baseSpeed=Number(document.getElementById('baseSpeed').value);
+  const initLychee=Number(document.getElementById('initLychee').value);
+  const loss=Number(document.getElementById('lycheeLoss').value);
   teams.forEach(t=>{
-    const v=calcRouteDistance(t).toFixed(1);
-    const r=document.createElement('div');r.innerHTML=`<span>${t}</span><span>${v}</span>`;
-    box.appendChild(r);
+    const {px}=calcRoute(t);
+    if(px===0)return;
+    const scale=routeDist[t]/px;
+    const time=routeDist[t]/baseSpeed;
+    const lychee=Math.max(0,initLychee-time*loss);
+    const d=document.createElement('div');
+    d.innerHTML=`<span>${t}</span><span>${time.toFixed(0)} 秒 / ${Math.floor(lychee)}</span>`;
+    box.appendChild(d);
   });
 }
 
@@ -101,7 +114,7 @@ function draw(){
     ctx.fillStyle=n===selected?'#0ff':c;
     ctx.beginPath();ctx.arc(n.x,n.y,8,0,Math.PI*2);ctx.fill();
   });
-  updateDistInfo();
+  updateResult();
   requestAnimationFrame(draw);
 }
 
