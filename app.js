@@ -51,17 +51,20 @@ function toggleCity(city){
   refreshCityButtons();
 }
 
+/* ===== 追加：HTML互換用（削除禁止ルール対応） ===== */
+/* HTMLで setCity() が呼ばれているためラッパーを追加 */
+function setCity(city){
+  toggleCity(city);
+}
+/* ===== 追加ここまで ===== */
+
 function refreshCityButtons(){
   document.querySelectorAll('.city-btn').forEach(btn=>{
     const c = btn.textContent;
     if(selectedCities.includes(c)){
       btn.classList.add('active');
-      btn.style.background = colors[c];
-      btn.style.color = '#000';
     }else{
       btn.classList.remove('active');
-      btn.style.background = '';
-      btn.style.color = '';
     }
   });
 }
@@ -146,6 +149,14 @@ canvas.onmousedown = e=>{
     e.clientY - r.top
   );
 };
+
+/* ===== 追加：HTMLに存在するが未定義だった関数 ===== */
+function runSim(){}
+function resetSim(){
+  nodes = [];
+}
+function deleteSelected(){}
+/* ===== 追加ここまで ===== */
 
 /***** 起動 *****/
 draw();
