@@ -2,93 +2,120 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 ルート配置エディタ</title>
+<title>ライチ争奪戦 シミュレーター（配置→実行）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
 h1{font-size:16px;margin:8px}
-.wrap{display:grid;grid-template-columns:280px 1fr;height:100vh}
+.wrap{display:grid;grid-template-columns:320px 1fr;height:100vh}
 .panel{background:#222;padding:12px;overflow:auto}
 button{width:100%;margin:4px 0;padding:6px}
 label{font-size:12px;color:#ccc}
 canvas{background:#000;touch-action:none}
-.node{font-size:12px}
+hr{border:0;border-top:1px solid #444;margin:8px 0}
 </style>
 </head>
 <body>
-<h1>🧭 ライチ争奪戦｜ルート配置エディタ（STEP A）</h1>
+<h1>🐎 ライチ争奪戦｜配置→6チーム同時シミュレーション</h1>
 <div class="wrap">
 <div class="panel">
-<button id="addInn">➕ 宿舎ノード追加</button>
-<button id="addFork">➕ 分岐ノード追加</button>
-<button id="addGoal">➕ ゴールノード追加</button>
+<strong>ノード追加</strong>
+<button onclick="addNode('start')">➕ スタート</button>
+<button onclick="addNode('inn_small')">➕ 小宿</button>
+<button onclick="addNode('inn_big')">➕ 大宿</button>
+<button onclick="addNode('fork')">➕ 分岐</button>
+<button onclick="addNode('merge')">➕ 合流</button>
+<button onclick="addNode('goal')">➕ ゴール</button>
 <hr>
-<label>選択ノード：<span id="sel">なし</span></label>
-<div id="routeChecks"></div>
+<button onclick="startSim()">▶ シミュレーション開始</button>
+<button onclick="resetSim()">🔄 リセット</button>
 <hr>
-<button id="export">📄 JSON書き出し</button>
-<p style="font-size:12px">※ map.png を背景に配置できます</p>
+<label>時間倍率</label>
+<input id="scale" type="number" value="5">
+<hr>
+<strong>選択ノード</strong><br>
+<span id="sel">なし</span>
+<div id="nodeOptions"></div>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
 <script>
+// ===== 共通 =====
 const canvas=document.getElementById('field');
 const ctx=canvas.getContext('2d');
-
-const bg=new Image();bg.src='map.png';
-
+const bg=new Image(); bg.src='map.png';
+const scaleEl=document.getElementById('scale');
 const teams=['桂州','寿州','江州','涪州','永州','光州'];
-let nodes=[];
-let selected=null;
-let drag=null;
+let nodes=[]; let selected=null; let drag=null;
+let horses=[]; let running=false;
 
 function addNode(type){
   nodes.push({id:Date.now()+Math.random(),x:450,y:600,type,teams:[...teams]});
 }
 
-function draw(){
-  ctx.fillStyle='#203040';ctx.fillRect(0,0,canvas.width,canvas.height);
-  if(bg.complete)ctx.drawImage(bg,0,0,canvas.width,canvas.height);
-  nodes.forEach(n=>{
-    ctx.fillStyle=n===selected?'#0ff':'#fff';
-    ctx.beginPath();ctx.arc(n.x,n.y,10,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#000';ctx.fillText(n.type,n.x+12,n.y);
+function resetSim(){ running=false; horses=[]; }
+
+function startSim(){
+  // 各チーム用に、通過ノードをY順で抽出
+  horses = teams.map((t,i)=>{
+    const path = nodes.filter(n=>n.teams.includes(t))
+      .sort((a,b)=>b.y-a.y); // 下→上
+    return {team:t,color:colors[t],path,idx:0,t:0,x:path[0]?.x||0,y:path[0]?.y||0,speed:1};
   });
+  running=true;
+}
+
+const colors={桂州:'#ff4d4d',寿州:'#4dff4d',江州:'#4d4dff',涪州:'#ffd24d',永州:'#ff4dff',光州:'#4dffff'};
+
+function draw(){
+  ctx.fillStyle='#203040'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(bg.complete && bg.naturalWidth>0) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+
+  // ノード表示
+  nodes.forEach(n=>{
+    let c='#fff';
+    if(n.type==='start')c='#0f0'; if(n.type==='goal')c='#f00';
+    if(n.type==='inn_small')c='#aaa'; if(n.type==='inn_big')c='#ffd700';
+    if(n.type==='fork')c='#0ff'; if(n.type==='merge')c='#f0f';
+    ctx.fillStyle=n===selected?'#0ff':c;
+    ctx.beginPath(); ctx.arc(n.x,n.y,8,0,Math.PI*2); ctx.fill();
+  });
+
+  // シミュレーション
+  if(running){
+    horses.forEach(h=>{
+      if(h.idx>=h.path.length-1) return;
+      const from=h.path[h.idx]; const to=h.path[h.idx+1];
+      const dx=to.x-from.x, dy=to.y-from.y;
+      const dist=Math.hypot(dx,dy)||1;
+      h.t += h.speed*Number(scaleEl.value)/dist;
+      if(h.t>=1){ h.idx++; h.t=0; if(to.type.includes('inn')) h.speed=3; }
+      h.x=from.x+dx*h.t; h.y=from.y+dy*h.t;
+      ctx.fillStyle=colors[h.team];
+      ctx.beginPath(); ctx.arc(h.x,h.y,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#000'; ctx.fillText(h.team,h.x+12,h.y);
+    });
+  }
+
   requestAnimationFrame(draw);
 }
 
-function mousePos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
-canvas.onmousedown=e=>{
-  const m=mousePos(e);
-  selected=null;
-  for(const n of nodes){if(Math.hypot(n.x-m.x,n.y-m.y)<12){selected=n;drag=n;break}}
-  updatePanel();
-}
-canvas.onmousemove=e=>{if(drag){const m=mousePos(e);drag.x=m.x;drag.y=m.y}}
+// ===== 操作 =====
+function getPos(e){const r=canvas.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+canvas.onmousedown=e=>{const m=getPos(e); selected=null; for(const n of nodes){if(Math.hypot(n.x-m.x,n.y-m.y)<10){selected=n;drag=n;break}} updatePanel();}
+canvas.onmousemove=e=>{if(drag){const m=getPos(e);drag.x=m.x;drag.y=m.y}}
 canvas.onmouseup=()=>drag=null;
 
 function updatePanel(){
-  document.getElementById('sel').textContent=selected?selected.type:'なし';
-  const box=document.getElementById('routeChecks');box.innerHTML='';
-  if(!selected)return;
+  const sel=document.getElementById('sel'); const opt=document.getElementById('nodeOptions');
+  sel.textContent=selected?selected.type:'なし'; opt.innerHTML='';
+  if(!selected) return;
   teams.forEach(t=>{
     const c=document.createElement('input');c.type='checkbox';c.checked=selected.teams.includes(t);
-    c.onchange=()=>{
-      if(c.checked&&!selected.teams.includes(t))selected.teams.push(t);
-      if(!c.checked)selected.teams=selected.teams.filter(x=>x!==t);
-    }
-    const l=document.createElement('label');l.append(c,' ',t);
-    box.append(l,document.createElement('br'));
-  })
-}
-
-document.getElementById('addInn').onclick=()=>addNode('inn');
-document.getElementById('addFork').onclick=()=>addNode('fork');
-document.getElementById('addGoal').onclick=()=>addNode('goal');
-
-document.getElementById('export').onclick=()=>{
-  const data=JSON.stringify(nodes,null,2);
-  alert(data);
+    c.onchange=()=>{ if(c.checked&&!selected.teams.includes(t))selected.teams.push(t);
+      if(!c.checked)selected.teams=selected.teams.filter(x=>x!==t); };
+    opt.append(c,' ',t,document.createElement('br'));
+  });
 }
 
 draw();
