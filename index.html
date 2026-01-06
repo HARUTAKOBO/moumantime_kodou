@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 デバッグSTEP1（6色確認）</title>
+<title>ライチ争奪戦 デバッグSTEP2（マップ重ね）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
@@ -15,24 +15,30 @@ canvas{background:#000}
 </style>
 </head>
 <body>
-<h1>🐎 デバッグSTEP1：6色の丸が見えるか確認</h1>
+<h1>🐎 デバッグSTEP2：map.png を薄く重ねて確認</h1>
 <div class="wrap">
 <div class="panel">
-<label>速度（小さくするとゆっくり）</label>
+<label>速度</label>
 <input id="speed" type="number" value="2">
+<label>マップ透明度</label>
+<input id="alpha" type="number" step="0.1" min="0" max="1" value="0.6">
 <button id="reset">リセット</button>
 <p style="font-size:12px;line-height:1.4">
-・6色の丸が同時に動けばOK<br>
-・まだマップは使いません
+・map.png は index.html と同じフォルダに置く<br>
+・見えなくなったら透明度を下げる
 </p>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
 <script>
-// ===== STEP1: 視覚確認専用 =====
+// ===== STEP2: マップ重ね =====
 const canvas = document.getElementById('field');
 const ctx = canvas.getContext('2d');
 const speedEl = document.getElementById('speed');
+const alphaEl = document.getElementById('alpha');
+
+const bg = new Image();
+bg.src = 'map.png'; // 同階層
 
 const horses = [
   {name:'桂州', color:'#ff4d4d', x:100, y:200},
@@ -46,16 +52,22 @@ const horses = [
 let t = 0;
 
 function draw(){
-  // 背景
+  // 背景ベース（必ず見える）
   ctx.fillStyle = '#203040';
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // グリッド
-  ctx.strokeStyle = '#405870';
-  for(let x=0;x<canvas.width;x+=100){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
-  for(let y=0;y<canvas.height;y+=100){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+  // マップ（あれば薄く）
+  if(bg.complete && bg.naturalWidth>0){
+    ctx.save();
+    ctx.globalAlpha = Number(alphaEl.value);
+    ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+    ctx.restore();
+  } else {
+    ctx.fillStyle='#fff';
+    ctx.fillText('map.png が見つかりません',20,30);
+  }
 
-  // 馬（6色）
+  // 6色の丸（常に最前面）
   horses.forEach((h,i)=>{
     const dx = (t + i*50) % 600;
     const dy = (t + i*30) % 400;
