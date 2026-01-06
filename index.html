@@ -2,43 +2,42 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦｜ノード配置・削除・ルート設定 完全版</title>
+<title>ライチ争奪戦｜最終安定版（都市別ノード方式）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
 h1{font-size:16px;margin:8px}
-.wrap{display:grid;grid-template-columns:400px 1fr;height:100vh}
-.panel{background:#222;padding:12px;overflow:auto}
-button,input{width:100%;margin:4px 0;padding:6px}
-label{font-size:12px;color:#ccc}
-canvas{background:#000;touch-action:none}
+.wrap{display:grid;grid-template-columns:420px 1fr;height:100vh}
+.panel{background:#222;padding:10px;overflow:auto}
+button,input{width:100%;margin:3px 0;padding:6px}
+canvas{background:#000}
 hr{border:0;border-top:1px solid #444;margin:8px 0}
-.table{font-size:12px}
-.table div{display:flex;justify-content:space-between}
-.node-btn{background:#444}
+.city{border:1px solid #333;padding:6px;margin:6px 0}
+.small{font-size:12px;color:#ccc}
+.bar{height:6px;background:#444}
+.bar span{display:block;height:100%}
 </style>
 </head>
 <body>
-<h1>🧭 ライチ争奪戦｜ノード配置・削除・ルート設定</h1>
+<h1>🧭 ライチ争奪戦｜完成版（都市別ノード・距離・ライチ連動）</h1>
 <div class="wrap">
 <div class="panel">
-<strong>ノード連続配置</strong>
-<div>現在モード：<span id="placeMode">なし</span></div>
-<button onclick="setPlaceMode('start')">スタート</button>
-<button onclick="setPlaceMode('inn_small')">小宿</button>
-<button onclick="setPlaceMode('inn_big')">大宿</button>
-<button onclick="setPlaceMode('fork')">分岐</button>
-<button onclick="setPlaceMode('merge')">合流</button>
-<button onclick="setPlaceMode('goal')">ゴール</button>
-<button onclick="clearPlaceMode()">配置モード解除</button>
+<strong>共通ノード</strong>
+<button onclick="setMode('start','all')">スタート配置</button>
+<button onclick="setMode('goal','all')">ゴール配置</button>
 <hr>
-<strong>選択ノード</strong>
-<div id="selectedInfo">なし</div>
-<div id="teamChecks"></div>
-<button onclick="deleteSelected()" class="node-btn">🗑 このノードを削除</button>
+<strong>都市別ノード配置</strong>
+<div id="cities"></div>
 <hr>
-<strong>距離・時間結果</strong>
-<div id="result" class="table"></div>
+<strong>基本設定</strong>
+<label>総距離</label><input id="totalDist" type="number" value="50000000">
+<label>基本速度</label><input id="baseSpeed" type="number" value="1389">
+<label>初期ライチ</label><input id="initLychee" type="number" value="10600000">
+<label>ライチ減少/秒</label><input id="loss" type="number" value="100">
+<hr>
+<strong>結果</strong>
+<div id="result"></div>
+<button onclick="deleteSelected()">🗑 選択ノード削除</button>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
@@ -47,89 +46,81 @@ const canvas=document.getElementById('field');
 const ctx=canvas.getContext('2d');
 const bg=new Image(); bg.src='map.png';
 
-const teams=['桂州','寿州','江州','涪州','永州','光州'];
+const cities=['桂州','寿州','江州','涪州','永州','光州'];
 const colors={桂州:'#ff4d4d',寿州:'#4dff4d',江州:'#4d4dff',涪州:'#ffd24d',永州:'#ff4dff',光州:'#4dffff'};
 
 let nodes=[];
-let selected=null;
-let drag=null;
-let placeMode=null;
+let mode=null; // {type, city}
+let selected=null; let drag=null;
 
-function setPlaceMode(type){placeMode=type;document.getElementById('placeMode').textContent=type;}
-function clearPlaceMode(){placeMode=null;document.getElementById('placeMode').textContent='なし';}
+const cityBox=document.getElementById('cities');
+cities.forEach(c=>{
+  const d=document.createElement('div');d.className='city';
+  d.innerHTML=`<strong>${c}</strong>
+  <button onclick=\"setMode('inn_small','${c}')\">小宿</button>
+  <button onclick=\"setMode('inn_big','${c}')\">大宿</button>
+  <button onclick=\"setMode('fork','${c}')\">分岐</button>
+  <button onclick=\"setMode('merge','${c}')\">合流</button>`;
+  cityBox.appendChild(d);
+});
 
-function addNode(type,x,y){nodes.push({id:Date.now()+Math.random(),x,y,type,teams:[...teams]});}
+function setMode(type,city){mode={type,city};}
 
-function deleteSelected(){
-  if(!selected) return;
-  nodes = nodes.filter(n=>n!==selected);
-  selected=null;
-  updateSelectedPanel();
+function addNode(x,y){nodes.push({id:Date.now()+Math.random(),x,y,type:mode.type,city:mode.city});}
+function deleteSelected(){if(!selected)return;nodes=nodes.filter(n=>n!==selected);selected=null;}
+
+function routeNodes(city){
+  return nodes.filter(n=>n.city==='all'||n.city===city)
+    .sort((a,b)=>{
+      if(a.type==='start')return-1;if(b.type==='start')return 1;
+      if(a.type==='goal')return 1;if(b.type==='goal')return -1;
+      return b.y-a.y;
+    });
 }
 
-function updateSelectedPanel(){
-  const info=document.getElementById('selectedInfo');
-  const box=document.getElementById('teamChecks');
-  box.innerHTML='';
-  if(!selected){info.textContent='なし';return;}
-  info.textContent=`${selected.type}`;
-  teams.forEach(t=>{
-    const c=document.createElement('input');c.type='checkbox';c.checked=selected.teams.includes(t);
-    c.onchange=()=>{
-      if(c.checked&&!selected.teams.includes(t)) selected.teams.push(t);
-      if(!c.checked) selected.teams=selected.teams.filter(x=>x!==t);
-    };
-    const l=document.createElement('label');l.append(c,' ',t);
-    box.append(l,document.createElement('br'));
-  });
-}
-
-function calcRoute(team){
-  const path=nodes.filter(n=>n.teams.includes(team)).sort((a,b)=>{
-    if(a.type==='start')return-1;if(b.type==='start')return 1;
-    if(a.type==='goal')return 1;if(b.type==='goal')return -1;
-    return b.y-a.y;
-  });
+function calc(city){
+  const path=routeNodes(city); if(path.length<2) return null;
   let px=0;
-  for(let i=0;i<path.length-1;i++){
-    px+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
-  }
-  return px;
+  for(let i=0;i<path.length-1;i++) px+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
+  const dist=Number(document.getElementById('totalDist').value);
+  const speed=Number(document.getElementById('baseSpeed').value);
+  const time=dist/speed;
+  const ly0=Number(document.getElementById('initLychee').value);
+  const loss=Number(document.getElementById('loss').value);
+  return {px,time,ly:Math.max(0,ly0-time*loss)};
 }
 
-function updateResult(){
-  const box=document.getElementById('result');box.innerHTML='';
-  teams.forEach(t=>{
+function drawResult(){
+  const r=document.getElementById('result');r.innerHTML='';
+  cities.forEach(c=>{
+    const v=calc(c); if(!v) return;
     const d=document.createElement('div');
-    d.innerHTML=`<span>${t}</span><span>${calcRoute(t).toFixed(1)} px</span>`;
-    box.appendChild(d);
+    d.innerHTML=`<div class='small'>${c} ${v.time.toFixed(0)}秒 / ${Math.floor(v.ly)}</div>
+    <div class='bar'><span style='width:${v.ly/Number(initLychee.value)*100}%;background:${colors[c]}'></span></div>`;
+    r.appendChild(d);
   });
 }
 
 function draw(){
   ctx.fillStyle='#203040';ctx.fillRect(0,0,canvas.width,canvas.height);
   if(bg.complete) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
-
   nodes.forEach(n=>{
-    let c='#fff';
-    if(n.type==='start')c='#0f0';if(n.type==='goal')c='#f00';
-    if(n.type==='inn_small')c='#aaa';if(n.type==='inn_big')c='#ffd700';
-    if(n.type==='fork')c='#0ff';if(n.type==='merge')c='#f0f';
+    let c=n.city==='all'?'#fff':colors[n.city];
+    if(n.type==='start')c='#0f0'; if(n.type==='goal')c='#f00';
     ctx.fillStyle=n===selected?'#0ff':c;
     ctx.beginPath();ctx.arc(n.x,n.y,8,0,Math.PI*2);ctx.fill();
   });
-  updateResult();
+  drawResult();
   requestAnimationFrame(draw);
 }
 
-function getPos(e){const r=canvas.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+function pos(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
 canvas.onmousedown=e=>{
-  const m=getPos(e);selected=null;
-  if(placeMode){addNode(placeMode,m.x,m.y);return;}
+  const m=pos(e); selected=null;
+  if(mode){addNode(m.x,m.y);return;}
   for(const n of nodes){if(Math.hypot(n.x-m.x,n.y-m.y)<10){selected=n;drag=n;break;}}
-  updateSelectedPanel();
 }
-canvas.onmousemove=e=>{if(drag){const m=getPos(e);drag.x=m.x;drag.y=m.y;}}
+canvas.onmousemove=e=>{if(drag){const m=pos(e);drag.x=m.x;drag.y=m.y;}}
 canvas.onmouseup=()=>drag=null;
 
 draw();
