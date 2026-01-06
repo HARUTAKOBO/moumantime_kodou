@@ -2,94 +2,146 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 デバッグSTEP2（マップ重ね）</title>
+<title>ライチ争奪戦 STEP3（ルート＋分岐＋宿舎）</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
 h1{font-size:16px;margin:8px}
 .wrap{display:grid;grid-template-columns:260px 1fr;height:100vh}
-.panel{background:#222;padding:12px}
+.panel{background:#222;padding:12px;overflow:auto}
 label{font-size:12px;color:#ccc}
 input,button{width:100%;margin:6px 0;padding:6px}
 canvas{background:#000}
 </style>
 </head>
 <body>
-<h1>🐎 デバッグSTEP2：map.png を薄く重ねて確認</h1>
+<h1>🐎 STEP3：ルート・分岐・宿舎つきシミュレーション</h1>
 <div class="wrap">
 <div class="panel">
-<label>速度</label>
-<input id="speed" type="number" value="2">
+<label>時間圧縮</label>
+<input id="scale" type="number" value="5">
 <label>マップ透明度</label>
 <input id="alpha" type="number" step="0.1" min="0" max="1" value="0.6">
 <button id="reset">リセット</button>
 <p style="font-size:12px;line-height:1.4">
-・map.png は index.html と同じフォルダに置く<br>
-・見えなくなったら透明度を下げる
+・6色の丸がルートに沿って進む<br>
+・白い円＝宿舎（通過で加速）
 </p>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
 </div>
 <script>
-// ===== STEP2: マップ重ね =====
+// ===== STEP3 本命 =====
 const canvas = document.getElementById('field');
 const ctx = canvas.getContext('2d');
-const speedEl = document.getElementById('speed');
+const scaleEl = document.getElementById('scale');
 const alphaEl = document.getElementById('alpha');
 
 const bg = new Image();
-bg.src = 'map.png'; // 同階層
+bg.src = 'map.png';
 
-const horses = [
-  {name:'桂州', color:'#ff4d4d', x:100, y:200},
-  {name:'寿州', color:'#4dff4d', x:200, y:300},
-  {name:'江州', color:'#4d4dff', x:300, y:400},
-  {name:'涪州', color:'#ffd24d', x:400, y:500},
-  {name:'永州', color:'#ff4dff', x:500, y:600},
-  {name:'光州', color:'#4dffff', x:600, y:700}
+// ノード（目視配置・後で微調整OK）
+const nodes = {
+  start:{x:450,y:1030},
+  a:{x:430,y:900},
+  b:{x:470,y:820},
+  c:{x:430,y:720},
+  fork:{x:480,y:660},
+  d1:{x:420,y:580},
+  d2:{x:540,y:580},
+  merge:{x:480,y:500},
+  e:{x:480,y:420},
+  goal:{x:460,y:220}
+};
+
+// 宿舎ノード
+const inns = ['a','b','c','d1','d2','e'];
+
+// 6ルート
+const routes = [
+  {name:'桂州', color:'#ff4d4d', path:['start','a','b','c','fork','d1','merge','e','goal']},
+  {name:'寿州', color:'#4dff4d', path:['start','a','b','c','fork','d2','merge','e','goal']},
+  {name:'江州', color:'#4d4dff', path:['start','a','b','c','fork','d2','merge','e','goal']},
+  {name:'涪州', color:'#ffd24d', path:['start','a','b','c','fork','d1','merge','e','goal']},
+  {name:'永州', color:'#ff4dff', path:['start','a','b','c','fork','d1','merge','e','goal']},
+  {name:'光州', color:'#4dffff', path:['start','a','b','c','fork','d2','merge','e','goal']}
 ];
 
-let t = 0;
+let horses=[];
+
+function resetSim(){
+  horses = routes.map(r=>({
+    route:r,
+    seg:0,
+    t:0,
+    speed:1,
+    buff:0,
+    pos:{...nodes[r.path[0]]}
+  }));
+}
 
 function draw(){
-  // 背景ベース（必ず見える）
-  ctx.fillStyle = '#203040';
+  ctx.fillStyle='#203040';
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // マップ（あれば薄く）
   if(bg.complete && bg.naturalWidth>0){
     ctx.save();
     ctx.globalAlpha = Number(alphaEl.value);
     ctx.drawImage(bg,0,0,canvas.width,canvas.height);
     ctx.restore();
-  } else {
-    ctx.fillStyle='#fff';
-    ctx.fillText('map.png が見つかりません',20,30);
   }
 
-  // 6色の丸（常に最前面）
-  horses.forEach((h,i)=>{
-    const dx = (t + i*50) % 600;
-    const dy = (t + i*30) % 400;
-    const x = h.x + dx;
-    const y = h.y + dy;
-
-    ctx.fillStyle = h.color;
+  // 宿舎表示
+  inns.forEach(k=>{
+    const n = nodes[k];
+    ctx.strokeStyle='#fff';
     ctx.beginPath();
-    ctx.arc(x,y,12,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.fillStyle = '#000';
-    ctx.fillText(h.name, x+14, y);
+    ctx.arc(n.x,n.y,8,0,Math.PI*2);
+    ctx.stroke();
   });
 
-  t += Number(speedEl.value);
+  // 馬
+  horses.forEach(h=>{
+    if(h.seg >= h.route.path.length-1) return;
+    const from = nodes[h.route.path[h.seg]];
+    const to   = nodes[h.route.path[h.seg+1]];
+    const dx = to.x-from.x;
+    const dy = to.y-from.y;
+    const dist = Math.hypot(dx,dy);
+
+    let v = 0.5;
+    if(h.buff>0){ v = 2; h.buff--; }
+
+    h.t += v * Number(scaleEl.value) / dist;
+
+    if(h.t>=1){
+      h.seg++;
+      h.t=0;
+      const nodeName = h.route.path[h.seg];
+      if(inns.includes(nodeName)){
+        h.buff = 300; // 宿舎バフ（視覚用）
+      }
+    }
+
+    h.pos.x = from.x + dx*h.t;
+    h.pos.y = from.y + dy*h.t;
+
+    ctx.fillStyle=h.route.color;
+    ctx.beginPath();
+    ctx.arc(h.pos.x,h.pos.y,10,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle='#000';
+    ctx.fillText(h.route.name,h.pos.x+12,h.pos.y);
+  });
+
   requestAnimationFrame(draw);
 }
 
+resetSim();
 requestAnimationFrame(draw);
 
-document.getElementById('reset').onclick = ()=>{t=0;};
+document.getElementById('reset').onclick = resetSim;
 </script>
 </body>
 </html>
