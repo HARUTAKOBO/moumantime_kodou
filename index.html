@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ライチ争奪戦 ノード配置＋時間・ライチ計算</title>
+<title>ライチ争奪戦｜ノード配置・削除・ルート設定 完全版</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
 body{margin:0;font-family:system-ui;background:#111;color:#fff}
 h1{font-size:16px;margin:8px}
-.wrap{display:grid;grid-template-columns:380px 1fr;height:100vh}
+.wrap{display:grid;grid-template-columns:400px 1fr;height:100vh}
 .panel{background:#222;padding:12px;overflow:auto}
 button,input{width:100%;margin:4px 0;padding:6px}
 label{font-size:12px;color:#ccc}
@@ -15,12 +15,11 @@ canvas{background:#000;touch-action:none}
 hr{border:0;border-top:1px solid #444;margin:8px 0}
 .table{font-size:12px}
 .table div{display:flex;justify-content:space-between}
-.bar{height:6px;background:#444;margin:2px 0}
-.bar span{display:block;height:100%}
+.node-btn{background:#444}
 </style>
 </head>
 <body>
-<h1>🐎 ライチ争奪戦｜ノード配置＋時間・ライチ</h1>
+<h1>🧭 ライチ争奪戦｜ノード配置・削除・ルート設定</h1>
 <div class="wrap">
 <div class="panel">
 <strong>ノード連続配置</strong>
@@ -33,16 +32,12 @@ hr{border:0;border-top:1px solid #444;margin:8px 0}
 <button onclick="setPlaceMode('goal')">ゴール</button>
 <button onclick="clearPlaceMode()">配置モード解除</button>
 <hr>
-<strong>基本設定</strong>
-<label>総距離</label><input id="totalDist" type="number" value="50000000">
-<label>基本速度（距離/秒）</label><input id="baseSpeed" type="number" value="1389">
-<label>初期ライチ</label><input id="initLychee" type="number" value="10600000">
-<label>ライチ減少/秒</label><input id="lycheeLoss" type="number" value="100">
+<strong>選択ノード</strong>
+<div id="selectedInfo">なし</div>
+<div id="teamChecks"></div>
+<button onclick="deleteSelected()" class="node-btn">🗑 このノードを削除</button>
 <hr>
-<strong>州別距離</strong>
-<div id="routeInputs"></div>
-<hr>
-<strong>結果（自動計算）</strong>
+<strong>距離・時間結果</strong>
 <div id="result" class="table"></div>
 </div>
 <canvas id="field" width="900" height="1200"></canvas>
@@ -60,18 +55,34 @@ let selected=null;
 let drag=null;
 let placeMode=null;
 
-const routeDist={};
-const routeInputs=document.getElementById('routeInputs');
-teams.forEach(t=>{
-  routeDist[t]=50000000;
-  const d=document.createElement('div');
-  d.innerHTML=`<label>${t}</label><input type="number" value="50000000" onchange="routeDist['${t}']=Number(this.value)">`;
-  routeInputs.appendChild(d);
-});
-
 function setPlaceMode(type){placeMode=type;document.getElementById('placeMode').textContent=type;}
 function clearPlaceMode(){placeMode=null;document.getElementById('placeMode').textContent='なし';}
+
 function addNode(type,x,y){nodes.push({id:Date.now()+Math.random(),x,y,type,teams:[...teams]});}
+
+function deleteSelected(){
+  if(!selected) return;
+  nodes = nodes.filter(n=>n!==selected);
+  selected=null;
+  updateSelectedPanel();
+}
+
+function updateSelectedPanel(){
+  const info=document.getElementById('selectedInfo');
+  const box=document.getElementById('teamChecks');
+  box.innerHTML='';
+  if(!selected){info.textContent='なし';return;}
+  info.textContent=`${selected.type}`;
+  teams.forEach(t=>{
+    const c=document.createElement('input');c.type='checkbox';c.checked=selected.teams.includes(t);
+    c.onchange=()=>{
+      if(c.checked&&!selected.teams.includes(t)) selected.teams.push(t);
+      if(!c.checked) selected.teams=selected.teams.filter(x=>x!==t);
+    };
+    const l=document.createElement('label');l.append(c,' ',t);
+    box.append(l,document.createElement('br'));
+  });
+}
 
 function calcRoute(team){
   const path=nodes.filter(n=>n.teams.includes(team)).sort((a,b)=>{
@@ -83,29 +94,22 @@ function calcRoute(team){
   for(let i=0;i<path.length-1;i++){
     px+=Math.hypot(path[i+1].x-path[i].x,path[i+1].y-path[i].y);
   }
-  return {path,px};
+  return px;
 }
 
 function updateResult(){
   const box=document.getElementById('result');box.innerHTML='';
-  const baseSpeed=Number(document.getElementById('baseSpeed').value);
-  const initLychee=Number(document.getElementById('initLychee').value);
-  const loss=Number(document.getElementById('lycheeLoss').value);
   teams.forEach(t=>{
-    const {px}=calcRoute(t);
-    if(px===0)return;
-    const scale=routeDist[t]/px;
-    const time=routeDist[t]/baseSpeed;
-    const lychee=Math.max(0,initLychee-time*loss);
     const d=document.createElement('div');
-    d.innerHTML=`<span>${t}</span><span>${time.toFixed(0)} 秒 / ${Math.floor(lychee)}</span>`;
+    d.innerHTML=`<span>${t}</span><span>${calcRoute(t).toFixed(1)} px</span>`;
     box.appendChild(d);
   });
 }
 
 function draw(){
   ctx.fillStyle='#203040';ctx.fillRect(0,0,canvas.width,canvas.height);
-  if(bg.complete)ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+  if(bg.complete) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+
   nodes.forEach(n=>{
     let c='#fff';
     if(n.type==='start')c='#0f0';if(n.type==='goal')c='#f00';
@@ -123,6 +127,7 @@ canvas.onmousedown=e=>{
   const m=getPos(e);selected=null;
   if(placeMode){addNode(placeMode,m.x,m.y);return;}
   for(const n of nodes){if(Math.hypot(n.x-m.x,n.y-m.y)<10){selected=n;drag=n;break;}}
+  updateSelectedPanel();
 }
 canvas.onmousemove=e=>{if(drag){const m=getPos(e);drag.x=m.x;drag.y=m.y;}}
 canvas.onmouseup=()=>drag=null;
