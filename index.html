@@ -2,59 +2,45 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ライチ争奪戦｜UI改善版</title>
+<title>ライチ争奪戦｜完成確認版</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <style>
 *{box-sizing:border-box}
 body{
   margin:0;
   background:#0f1220;
   color:#fff;
-  font-family:"Segoe UI",system-ui;
+  font-family:system-ui;
 }
-
-/* ===== レイアウト ===== */
 .wrap{
   display:grid;
-  grid-template-columns:420px 1fr;
+  grid-template-columns:440px 1fr;
   height:100vh;
 }
 .panel{
-  background:linear-gradient(180deg,#1b1f3b,#14172a);
+  background:#1b1f3b;
   padding:12px;
   overflow:auto;
   z-index:10;
 }
-canvas{
-  background:#000;
-  display:block;
-}
+canvas{background:#000;display:block}
 
-/* ===== UI ===== */
 h2{
   font-size:14px;
   margin:10px 0 6px;
   color:#ffd86b;
 }
-.grid3,.grid6{
-  display:grid;
-  gap:6px;
-}
-.grid3{grid-template-columns:repeat(3,1fr)}
-.grid6{grid-template-columns:repeat(6,1fr)}
 
-.field{
-  min-width:0;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
-label{
-  font-size:11px;
-  color:#ccc;
-}
+/* grids */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.grid6{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.gridFields{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+
+/* inputs */
+.field{min-width:0}
+label{font-size:11px;color:#ccc}
 input{
+  width:100%;
   padding:6px;
   border-radius:8px;
   border:none;
@@ -63,7 +49,7 @@ input{
   text-align:right;
 }
 
-/* ===== 可愛いボタン ===== */
+/* buttons */
 button{
   padding:8px 6px;
   border:none;
@@ -72,21 +58,19 @@ button{
   color:#fff;
   font-weight:600;
   cursor:pointer;
-  transition:.15s;
   box-shadow:0 4px 0 #24339a;
+  transition:.15s;
 }
-button:hover{
-  filter:brightness(1.1);
-}
+button:hover{filter:brightness(1.1)}
 button:active{
   transform:translateY(3px);
   box-shadow:0 1px 0 #24339a;
 }
 
-/* ===== 結果 ===== */
-.result{
+/* tables */
+.table{
   display:grid;
-  grid-template-columns:40px 60px 1fr 60px 80px 60px;
+  grid-template-columns:60px 1.5fr repeat(4,1fr);
   gap:4px;
   font-size:12px;
 }
@@ -95,6 +79,14 @@ button:active{
   border-radius:8px;
   padding:4px;
   text-align:center;
+}
+
+/* result */
+.result{
+  display:grid;
+  grid-template-columns:40px 60px 1fr 60px 80px 60px;
+  gap:4px;
+  font-size:12px;
 }
 .bar{
   height:6px;
@@ -109,14 +101,16 @@ button:active{
 <body>
 <div class="wrap">
 
-<!-- 左 -->
+<!-- ===== 左パネル ===== -->
 <div class="panel">
 
 <div class="grid3">
   <button onclick="setType('start')">スタート</button>
   <button onclick="setType('goal')">ゴール</button>
-  <button onclick="runSim()">▶ 実行</button>
+  <button onclick="runSim()">▶ シミュレーション</button>
 </div>
+
+<button style="width:100%;margin-top:6px" onclick="resetSim()">リセット</button>
 
 <h2>都市</h2>
 <div class="grid6">
@@ -128,36 +122,51 @@ button:active{
   <button onclick="setCity('寿州')">寿州</button>
 </div>
 
-<h2>基本設定</h2>
+<button style="width:100%;margin-top:6px" onclick="deleteSelected()">選択ノード削除</button>
+
+<h2>ノード種別</h2>
 <div class="grid3">
-  <div class="field">
-    <label>総距離</label>
-    <input id="totalDist" value="50000000">
-  </div>
-  <div class="field">
-    <label>基本速度</label>
-    <input id="baseSpeed" value="1389">
-  </div>
-  <div class="field">
-    <label>減少/秒</label>
-    <input id="loss" value="100">
-  </div>
+  <button onclick="setType('inn_small')">小宿</button>
+  <button onclick="setType('inn_big')">大宿</button>
+  <button onclick="setType('fork')">分岐</button>
+  <button onclick="setType('merge')">合流</button>
 </div>
 
-<h2>結果</h2>
+<h2>基本設定</h2>
+<div class="gridFields">
+  <div class="field"><label>総距離</label><input id="totalDist" value="50000000"></div>
+  <div class="field"><label>基本速度/秒</label><input id="baseSpeed" value="1389"></div>
+  <div class="field"><label>宿駅通過加速バフ</label><input id="innBoost" value="6945"></div>
+</div>
+<div class="gridFields" style="margin-top:6px">
+  <div class="field"><label>初期ライチ数</label><input id="initLychee" value="10600000"></div>
+  <div class="field"><label>ライチ減少数/秒</label><input id="loss" value="100"></div>
+  <div class="field"><label>宿駅バフ持続時間</label><input id="innTime" value="900"></div>
+</div>
+
+<h2>都市別ルートバフ</h2>
+<div class="table">
+  <div class="cell">都市</div><div class="cell">ルートバフ</div>
+  <div class="cell">距離</div><div class="cell">速度</div><div class="cell">ライチ</div><div class="cell">宿駅</div>
+
+  <div class="cell">涪州</div><div class="cell">損失-20%</div><div class="cell">1</div><div class="cell">1</div><div class="cell">0.8</div><div class="cell">5</div>
+  <div class="cell">桂州</div><div class="cell">距離-5%</div><div class="cell">0.95</div><div class="cell">1</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">永州</div><div class="cell">防御+20%</div><div class="cell">1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">江州</div><div class="cell">速度+8%</div><div class="cell">1</div><div class="cell">1.08</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">光州</div><div class="cell">強奪損失-20%</div><div class="cell">1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">5</div>
+  <div class="cell">寿州</div><div class="cell">宿駅+1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">1</div><div class="cell">6</div>
+</div>
+
+<h2>結果（進行中）</h2>
 <div class="result">
-  <div class="cell">位</div>
-  <div class="cell">都市</div>
-  <div class="cell">ライチ</div>
-  <div class="cell">速度</div>
-  <div class="cell">残距離</div>
-  <div class="cell">時間</div>
+  <div class="cell">位</div><div class="cell">都市</div><div class="cell">ライチ</div>
+  <div class="cell">速度</div><div class="cell">残距離</div><div class="cell">時間</div>
 </div>
 <div id="result" class="result"></div>
 
 </div>
 
-<!-- 右 -->
+<!-- ===== マップ ===== -->
 <canvas id="field" width="900" height="1200"></canvas>
 
 </div>
@@ -165,18 +174,16 @@ button:active{
 <script>
 const canvas=document.getElementById('field');
 const ctx=canvas.getContext('2d');
+const bg=new Image(); bg.src='map.png';
 
 const cities=['涪州','桂州','永州','江州','光州','寿州'];
 const colors={
-  涪州:'#ff6b6b',
-  桂州:'#ffd93d',
-  永州:'#6bff95',
-  江州:'#6ba8ff',
-  光州:'#ff6bf0',
-  寿州:'#6bfff5'
+  涪州:'#ff6b6b',桂州:'#ffd93d',永州:'#6bff95',
+  江州:'#6ba8ff',光州:'#ff6bf0',寿州:'#6bfff5'
 };
 
 let nodes=[],currentType=null,currentCity=null;
+let selected=null,drag=null;
 let simRunning=false,simStart=0,simState={};
 
 function setType(t){currentType=t}
@@ -187,7 +194,12 @@ function addNode(x,y){
   nodes.push({x,y,type:currentType,city:currentCity});
 }
 
-/* ===== ルート距離計算（マップ反映） ===== */
+function deleteSelected(){
+  if(!selected) return;
+  nodes=nodes.filter(n=>n!==selected);
+  selected=null;
+}
+
 function routePx(city){
   const path=nodes.filter(n=>n.city===city);
   let px=0;
@@ -201,20 +213,23 @@ function runSim(){
   simState={};
   simRunning=true;
   simStart=performance.now();
-
-  const allPx=cities.reduce((s,c)=>s+routePx(c),0)||1;
+  const totalPx=cities.reduce((s,c)=>s+routePx(c),0)||1;
 
   cities.forEach(city=>{
     const px=routePx(city);
-    const dist=px/allPx*(+totalDist.value);
-    const speed=+baseSpeed.value;
+    const dist=px/totalPx*(+totalDist.value);
     simState[city]={
       time:0,
-      lychee:10600000,
-      speed,
+      lychee:+initLychee.value,
+      speed:+baseSpeed.value,
       remainDist:dist
     };
   });
+}
+
+function resetSim(){
+  simRunning=false;
+  simState={};
 }
 
 function updateSim(){
@@ -225,7 +240,7 @@ function updateSim(){
 
   cities.forEach(c=>{
     const s=simState[c];
-    if(!s||s.remainDist<=0) return;
+    if(!s||s.remainDist<=0||s.lychee<=0) return;
     s.remainDist=Math.max(0,s.remainDist-s.speed*dt);
     s.time+=dt;
     s.lychee=Math.max(0,s.lychee-(+loss.value)*dt);
@@ -238,7 +253,8 @@ function drawResult(){
   const rank=cities.slice().sort((a,b)=>simState[a].remainDist-simState[b].remainDist);
   rank.forEach((c,i)=>{
     const s=simState[c];
-    const rate=s.lychee/10600000;
+    if(!s) return;
+    const rate=s.lychee/(+initLychee.value);
     r.innerHTML+=`
       <div class="cell">${i+1}</div>
       <div class="cell" style="color:${colors[c]}">${c}</div>
@@ -255,12 +271,18 @@ function drawResult(){
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(bg.complete) ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+
   nodes.forEach(n=>{
     ctx.fillStyle=colors[n.city];
-    ctx.beginPath();
-    ctx.arc(n.x,n.y,8,0,Math.PI*2);
-    ctx.fill();
+    ctx.beginPath();ctx.arc(n.x,n.y,8,0,Math.PI*2);ctx.fill();
+    if(n.type==='start'){
+      ctx.fillStyle='#fff';
+      ctx.font='12px system-ui';
+      ctx.fillText(n.city,n.x+10,n.y-10);
+    }
   });
+
   updateSim();
   if(simRunning) drawResult();
   requestAnimationFrame(draw);
@@ -269,8 +291,20 @@ function draw(){
 canvas.onmousedown=e=>{
   if(simRunning) return;
   const r=canvas.getBoundingClientRect();
-  addNode(e.clientX-r.left,e.clientY-r.top);
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  selected=null;
+  for(const n of nodes){
+    if(Math.hypot(n.x-x,n.y-y)<10){selected=n;drag=n;return;}
+  }
+  addNode(x,y);
 };
+canvas.onmousemove=e=>{
+  if(drag&&!simRunning){
+    const r=canvas.getBoundingClientRect();
+    drag.x=e.clientX-r.left;drag.y=e.clientY-r.top;
+  }
+};
+canvas.onmouseup=()=>drag=null;
 
 draw();
 </script>
