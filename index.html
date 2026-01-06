@@ -14,29 +14,31 @@
 <div class="panel">
 
   <div class="grid3">
-  <button class="type-btn" onclick="setType('start')">スタート</button>
-  <button class="type-btn" onclick="setType('goal')">ゴール</button>
-  <button onclick="runSim()">▶ シミュレーション</button>
+    <!-- data-type を追加 -->
+    <button class="type-btn" data-type="start" onclick="setType('start')">スタート</button>
+    <button class="type-btn" data-type="goal" onclick="setType('goal')">ゴール</button>
+    <button onclick="runSim()">▶ シミュレーション</button>
   </div>
   
   <button style="width:100%;margin-top:6px" onclick="resetSim()">リセット</button>
 
 <h2>都市</h2>
 <div class="grid6">
-  <button onclick="setCity('涪州')">涪州</button>
-  <button onclick="setCity('桂州')">桂州</button>
-  <button onclick="setCity('永州')">永州</button>
-  <button onclick="setCity('江州')">江州</button>
-  <button onclick="setCity('光州')">光州</button>
-  <button onclick="setCity('寿州')">寿州</button>
+  <!-- class=city-btn / 関数名修正 -->
+  <button class="city-btn" onclick="toggleCity('涪州')">涪州</button>
+  <button class="city-btn" onclick="toggleCity('桂州')">桂州</button>
+  <button class="city-btn" onclick="toggleCity('永州')">永州</button>
+  <button class="city-btn" onclick="toggleCity('江州')">江州</button>
+  <button class="city-btn" onclick="toggleCity('光州')">光州</button>
+  <button class="city-btn" onclick="toggleCity('寿州')">寿州</button>
 </div>
 
 <button style="width:100%;margin-top:6px" onclick="deleteSelected()">選択ノード削除</button>
 
 <h2>ノード種別</h2>
 <div class="grid3">
-  <button class="type-btn" onclick="setType('inn_small')">小宿</button>
-  <button class="type-btn" onclick="setType('inn_big')">大宿</button>
+  <button class="type-btn" data-type="inn_small" onclick="setType('inn_small')">小宿</button>
+  <button class="type-btn" data-type="inn_big" onclick="setType('inn_big')">大宿</button>
 </div>
 
 <h2>基本設定</h2>
@@ -76,6 +78,7 @@
 <!-- ===== マップ ===== -->
 <canvas id="field" width="900" height="1200"></canvas>
 <script src="app.js"></script>
+
 </div>
 </body>
 </html>
