@@ -21,7 +21,7 @@
 
 <div class="panel">
   <label>時間圧縮（ゲーム秒/表示秒）</label>
-  <input id="scale" type="number" value="200">
+  <input id="scale" type="number" value="20">
 
   <label>基本速度</label>
   <input id="baseSpeed" type="number" value="1389">
@@ -59,7 +59,7 @@ const beeDebuffEl = document.getElementById('beeDebuff');
 const whipBuffEl = document.getElementById('whipBuff');
 
 const bg = new Image();
-bg.src = 'map.png'; // マップ画像
+bg.src = 'map.jpg'; // マップ画像
 
 const nodes = {
   start:{x:450,y:1030,type:'start'},
@@ -75,12 +75,12 @@ const nodes = {
 };
 
 const routes = [
- {name:'桂州',path:['start','a','b','c','fork1','d1','merge1','e','goal'],mod:1.0},
- {name:'寿州',path:['start','a','b','c','fork1','d2','merge1','e','goal'],mod:1.0},
- {name:'江州',path:['start','a','b','c','fork1','d2','merge1','e','goal'],mod:1.08},
- {name:'涪州',path:['start','a','b','c','fork1','d1','merge1','e','goal'],mod:1.0},
- {name:'永州',path:['start','a','b','c','fork1','d1','merge1','e','goal'],mod:1.0},
- {name:'光州',path:['start','a','b','c','fork1','d2','merge1','e','goal'],mod:1.0}
+ {name:'桂州', path:['start','a','b','c','fork1','d1','merge1','e','goal'], mod:1.0, color:'#ff4d4d'},
+ {name:'寿州', path:['start','a','b','c','fork1','d2','merge1','e','goal'], mod:1.0, color:'#4dff4d'},
+ {name:'江州', path:['start','a','b','c','fork1','d2','merge1','e','goal'], mod:1.08, color:'#4d4dff'},
+ {name:'涪州', path:['start','a','b','c','fork1','d1','merge1','e','goal'], mod:1.0, color:'#ffd24d'},
+ {name:'永州', path:['start','a','b','c','fork1','d1','merge1','e','goal'], mod:1.0, color:'#ff4dff'},
+ {name:'光州', path:['start','a','b','c','fork1','d2','merge1','e','goal'], mod:1.0, color:'#4dffff'}
 ];
 
 let horses = [];
@@ -126,45 +126,12 @@ function tick(now){
     ctx.fillStyle = '#203040';
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.strokeStyle = '#304860';
-    for(let x=0;x<canvas.width;x+=100){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
-    for(let y=0;y<canvas.height;y+=100){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
-    ctx.fillStyle='#fff';
-    ctx.fillText('⚠ map.jpg が読み込めていません',20,30);
-    ctx.fillText('HTMLと同じフォルダに map.jpg を置いてください',20,50);
-  }
-
-  horses.forEach(h=>{
-    if(h.seg >= h.route.path.length-1) return;
-
-    let speed = Number(baseSpeedEl.value) * h.route.mod * h.bee * h.whip;
-    if(h.buffRemain > 0){
-      speed *= Number(buffMultEl.value);
-      h.buffRemain -= dt * scaleV;
-    }
-
-    const from = nodes[h.route.path[h.seg]];
-    const to = nodes[h.route.path[h.seg+1]];
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const dist = Math.hypot(dx,dy) || 1;
-
-    h.t += (speed * dt * scaleV) / dist;
-
-    if(h.t >= 1){
-      h.seg++;
-      h.t = 0;
-      const node = nodes[h.route.path[h.seg]];
-      if(node && node.type==='inn'){
-        h.buffRemain += Number(buffTimeEl.value);
-      }
-    }
-
-    h.pos.x = from.x + dx * h.t;
-    h.pos.y = from.y + dy * h.t;
-
-    ctx.fillStyle='yellow';
-    ctx.beginPath(); ctx.arc(h.pos.x,h.pos.y,6,0,Math.PI*2); ctx.fill();
-    ctx.fillText(h.route.name,h.pos.x+8,h.pos.y);
+    for(let x=0;x<canvas.width;x+=100){ctx.fillStyle = h.route.color;
+    ctx.beginPath();
+    ctx.arc(h.pos.x,h.pos.y,8,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#000';
+    ctx.fillText(h.route.name,h.pos.x+10,h.pos.y);
   });
 
   requestAnimationFrame(tick);
