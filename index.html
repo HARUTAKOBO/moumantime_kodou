@@ -14,12 +14,14 @@
 <div class="panel">
 
 <div class="grid3">
-  <button onclick="setType('start')">スタート</button>
-  <button onclick="setType('goal')">ゴール</button>
-  <button onclick="runSim()">▶ シミュレーション</button>
+<button class="type-btn" onclick="setType('start')">スタート</button>
+<button class="type-btn" onclick="setType('goal')">ゴール</button>
+<button onclick="runSim()">▶ シミュレーション</button>
 </div>
 
-<button style="width:100%;margin-top:6px" onclick="resetSim()">リセット</button>
+  <button style="width:100%;margin-top:6px" onclick="resetSim()">リセット</button>
+  <button class="type-btn" onclick="setType('inn_small')">小宿</button>
+  <button class="type-btn" onclick="setType('inn_big')">大宿</button>
 
 <h2>都市</h2>
 <div class="grid6">
