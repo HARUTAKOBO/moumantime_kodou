@@ -58,8 +58,17 @@ function resetSim(){ running=false; horses=[]; }
 function startSim(){
   // 各チーム用に、通過ノードをY順で抽出
   horses = teams.map((t,i)=>{
-    const path = nodes.filter(n=>n.teams.includes(t))
-      .sort((a,b)=>b.y-a.y); // 下→上
+    const path = nodes
+      .filter(n=>n.teams.includes(t))
+      .sort((a,b)=>{
+        // start は必ず最初、goal は必ず最後
+        if(a.type==='start') return -1;
+        if(b.type==='start') return 1;
+        if(a.type==='goal') return 1;
+        if(b.type==='goal') return -1;
+        // それ以外は Y 座標（下→上）で順序決定
+        return b.y - a.y;
+      }); // 下→上
     return {team:t,color:colors[t],path,idx:0,t:0,x:path[0]?.x||0,y:path[0]?.y||0,speed:1};
   });
   running=true;
