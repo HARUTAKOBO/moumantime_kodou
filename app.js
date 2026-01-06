@@ -1,6 +1,6 @@
 const canvas=document.getElementById('field');
 const ctx=canvas.getContext('2d');
-const bg=new Image(); bg.src='map.png';
+const bg=new Image(); bg.src='map.jpg';
 
 const cities=['涪州','桂州','永州','江州','光州','寿州'];
 const colors={
