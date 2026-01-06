@@ -12,7 +12,31 @@ let nodes=[],currentType=null,currentCity=null;
 let selected=null,drag=null;
 let simRunning=false,simStart=0,simState={};
 
-function setType(t){currentType=t}
+function setType(t){
+  currentType = t;
+
+  // ノード種別の見た目更新
+  document.querySelectorAll('.type-btn').forEach(b=>{
+    b.classList.toggle('active', b.textContent === labelOf(t));
+  });
+
+  // スタート・ゴール時は都市選択不可
+  if(t === 'start' || t === 'goal'){
+    selectedCities = [];
+  }
+
+  refreshCityButtons();
+}
+
+function labelOf(t){
+  return {
+    start:'スタート',
+    goal:'ゴール',
+    inn_small:'小宿',
+    inn_big:'大宿'
+  }[t];
+}
+
 function setCity(c){currentCity=c}
 
 function addNode(x,y){
