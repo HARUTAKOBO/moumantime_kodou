@@ -60,29 +60,36 @@ function setPlaceMode(type){
   placeMode = type;
   document.getElementById('placeMode').textContent = type;
 }
+
 function clearPlaceMode(){
   placeMode = null;
   document.getElementById('placeMode').textContent = 'なし';
-});
 }
 
 function resetSim(){ running=false; horses=[]; }
 
 function startSim(){
-  // 各チーム用に、通過ノードをY順で抽出
-  horses = teams.map((t,i)=>{
+  // 各チーム用に、通過ノードを意味順＋Y順で抽出
+  horses = teams.map(t=>{
     const path = nodes
       .filter(n=>n.teams.includes(t))
       .sort((a,b)=>{
-        // start は必ず最初、goal は必ず最後
         if(a.type==='start') return -1;
         if(b.type==='start') return 1;
         if(a.type==='goal') return 1;
         if(b.type==='goal') return -1;
-        // それ以外は Y 座標（下→上）で順序決定
         return b.y - a.y;
-      }); // 下→上
-    return {team:t,color:colors[t],path,idx:0,t:0,x:path[0]?.x||0,y:path[0]?.y||0,speed:1};
+      });
+    return {
+      team:t,
+      color:colors[t],
+      path,
+      idx:0,
+      t:0,
+      x:path[0]?.x||0,
+      y:path[0]?.y||0,
+      speed:1
+    };
   });
   running=true;
 }
@@ -96,9 +103,12 @@ function draw(){
   // ノード表示
   nodes.forEach(n=>{
     let c='#fff';
-    if(n.type==='start')c='#0f0'; if(n.type==='goal')c='#f00';
-    if(n.type==='inn_small')c='#aaa'; if(n.type==='inn_big')c='#ffd700';
-    if(n.type==='fork')c='#0ff'; if(n.type==='merge')c='#f0f';
+    if(n.type==='start')c='#0f0';
+    if(n.type==='goal')c='#f00';
+    if(n.type==='inn_small')c='#aaa';
+    if(n.type==='inn_big')c='#ffd700';
+    if(n.type==='fork')c='#0ff';
+    if(n.type==='merge')c='#f0f';
     ctx.fillStyle=n===selected?'#0ff':c;
     ctx.beginPath(); ctx.arc(n.x,n.y,8,0,Math.PI*2); ctx.fill();
   });
@@ -123,7 +133,12 @@ function draw(){
 }
 
 // ===== 操作 =====
-function getPos(e){const r=canvas.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+function getPos(e){
+  const r=canvas.getBoundingClientRect();
+  const t=e.touches?e.touches[0]:e;
+  return {x:t.clientX-r.left,y:t.clientY-r.top};
+}
+
 canvas.onmousedown=e=>{
   const m=getPos(e);
   selected=null;
@@ -142,17 +157,30 @@ canvas.onmousedown=e=>{
   }
   updatePanel();
 }
-canvas.onmousemove=e=>{if(drag){const m=getPos(e);drag.x=m.x;drag.y=m.y}}
+
+canvas.onmousemove=e=>{
+  if(drag){
+    const m=getPos(e);
+    drag.x=m.x; drag.y=m.y;
+  }
+}
+
 canvas.onmouseup=()=>drag=null;
 
 function updatePanel(){
-  const sel=document.getElementById('sel'); const opt=document.getElementById('nodeOptions');
-  sel.textContent=selected?selected.type:'なし'; opt.innerHTML='';
+  const sel=document.getElementById('sel');
+  const opt=document.getElementById('nodeOptions');
+  sel.textContent=selected?selected.type:'なし';
+  opt.innerHTML='';
   if(!selected) return;
   teams.forEach(t=>{
-    const c=document.createElement('input');c.type='checkbox';c.checked=selected.teams.includes(t);
-    c.onchange=()=>{ if(c.checked&&!selected.teams.includes(t))selected.teams.push(t);
-      if(!c.checked)selected.teams=selected.teams.filter(x=>x!==t); };
+    const c=document.createElement('input');
+    c.type='checkbox';
+    c.checked=selected.teams.includes(t);
+    c.onchange=()=>{
+      if(c.checked && !selected.teams.includes(t)) selected.teams.push(t);
+      if(!c.checked) selected.teams=selected.teams.filter(x=>x!==t);
+    };
     opt.append(c,' ',t,document.createElement('br'));
   });
 }
