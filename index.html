@@ -1,169 +1,71 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>ライチ争奪戦 ビジュアルシミュレーター（完成版）</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body{margin:0;padding:0;font-family:system-ui;background:#1e1e1e;color:#fff}
-    h1{font-size:18px;margin:8px}
-    .wrap{display:grid;grid-template-columns:260px 1fr;height:100vh}
-    .panel{padding:12px;background:#2a2a2a;overflow:auto}
-    label{font-size:12px;color:#ccc}
-    input,button{width:100%;margin:6px 0;padding:6px}
-    canvas{display:block;background:#000}
-    button{cursor:pointer}
-  </style>
+<meta charset="UTF-8" />
+<title>ライチ争奪戦 ルートシミュレーター（強制表示版）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+body{margin:0;font-family:system-ui;background:#111;color:#fff}
+h1{font-size:16px;margin:8px}
+.wrap{display:grid;grid-template-columns:260px 1fr;height:100vh}
+.panel{background:#222;padding:12px}
+label{font-size:12px;color:#ccc}
+input,button{width:100%;margin:6px 0;padding:6px}
+canvas{background:#000}
+</style>
 </head>
 <body>
-<h1>🐎 ライチ争奪戦・ルート完全再現シミュレーター</h1>
+<h1>🐎 ライチ争奪戦・必ず見えるデバッグ版</h1>
 <div class="wrap">
-
 <div class="panel">
-  <label>時間圧縮（ゲーム秒/表示秒）</label>
-  <input id="scale" type="number" value="20">
-
-  <label>基本速度</label>
-  <input id="baseSpeed" type="number" value="1389">
-
-  <label>宿舎倍率</label>
-  <input id="buffMult" type="number" value="5">
-
-  <label>宿舎バフ時間（秒）</label>
-  <input id="buffTime" type="number" value="900">
-
-  <label>蜂デバフ倍率</label>
-  <input id="beeDebuff" type="number" step="0.1" value="0.7">
-
-  <label>鞭バフ倍率</label>
-  <input id="whipBuff" type="number" step="0.1" value="1.3">
-
-  <button id="whip0">🏇 桂州に鞭</button>
-  <button id="bee5">🐝 寿州に蜂</button>
-  <button id="reset">🔄 リセット</button>
+<label>時間圧縮</label>
+<input id="scale" type="number" value="5">
+<button id="reset">リセット</button>
 </div>
-
 <canvas id="field" width="900" height="1200"></canvas>
-
 </div>
-
 <script>
+// ====== 絶対に動く最小構成 ======
 const canvas = document.getElementById('field');
 const ctx = canvas.getContext('2d');
-
 const scaleEl = document.getElementById('scale');
-const baseSpeedEl = document.getElementById('baseSpeed');
-const buffMultEl = document.getElementById('buffMult');
-const buffTimeEl = document.getElementById('buffTime');
-const beeDebuffEl = document.getElementById('beeDebuff');
-const whipBuffEl = document.getElementById('whipBuff');
 
-const bg = new Image();
-bg.src = 'map.png'; // マップ画像
+let t = 0;
 
-const nodes = {
-  start:{x:450,y:1030,type:'start'},
-  a:{x:430,y:900,type:'inn'},
-  b:{x:470,y:820,type:'inn'},
-  c:{x:430,y:720,type:'inn'},
-  fork1:{x:480,y:660,type:'fork'},
-  d1:{x:420,y:580,type:'inn'},
-  d2:{x:540,y:580,type:'inn'},
-  merge1:{x:480,y:500,type:'merge'},
-  e:{x:480,y:420,type:'inn'},
-  goal:{x:460,y:220,type:'goal'}
-};
-
-const routes = [
- {name:'桂州', path:['start','a','b','c','fork1','d1','merge1','e','goal'], mod:1.0, color:'#ff4d4d'},
- {name:'寿州', path:['start','a','b','c','fork1','d2','merge1','e','goal'], mod:1.0, color:'#4dff4d'},
- {name:'江州', path:['start','a','b','c','fork1','d2','merge1','e','goal'], mod:1.08, color:'#4d4dff'},
- {name:'涪州', path:['start','a','b','c','fork1','d1','merge1','e','goal'], mod:1.0, color:'#ffd24d'},
- {name:'永州', path:['start','a','b','c','fork1','d1','merge1','e','goal'], mod:1.0, color:'#ff4dff'},
- {name:'光州', path:['start','a','b','c','fork1','d2','merge1','e','goal'], mod:1.0, color:'#4dffff'}
-];
-
-let horses = [];
-let last = performance.now();
-
-function resetSim(){
-  horses = routes.map(r=>({
-    route:r,
-    seg:0,
-    t:0,
-    pos:{...nodes[r.path[0]]},
-    bee:1,
-    whip:1,
-    buffRemain: r.path.filter(n=>nodes[n].type==='inn').length * Number(buffTimeEl.value)
-  }));
-}
-
-function safeHorse(i){ return horses[i] ?? null; }
-
-function useBee(i){
-  const h = safeHorse(i);
-  if(!h) return;
-  h.bee = Number(beeDebuffEl.value);
-  setTimeout(()=>{ h.bee = 1; },3000);
-}
-
-function useWhip(i){
-  const h = safeHorse(i);
-  if(!h) return;
-  h.whip = Number(whipBuffEl.value);
-  setTimeout(()=>{ h.whip = 1; },3000);
-}
-
-function tick(now){
-  const dt = (now-last)/1000; last = now;
-  const scaleV = Number(scaleEl.value);
-
-  // === 常に背景を描画（真っ黒防止）===
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // デバッグ用グリッド背景（必ず表示）
+function draw(){
+  // 背景（毎フレーム必ず描画）
   ctx.fillStyle = '#203040';
   ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.strokeStyle = '#304860';
+
+  // グリッド
+  ctx.strokeStyle = '#405870';
   for(let x=0;x<canvas.width;x+=100){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
   for(let y=0;y<canvas.height;y+=100){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
 
-  // 背景画像（あれば上書き）
-  if(bg.complete && bg.naturalWidth>0){
-    ctx.globalAlpha = 1;
-    ctx.drawImage(bg,0,0,canvas.width,canvas.height);
-  } else {
-    ctx.fillStyle = '#fff';
-    ctx.fillText('map.png が読み込めていません',20,30);
-  } else {
-    // 背景が読み込めない場合の仮表示
-    ctx.fillStyle = '#203040';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle = '#304860';
-    for(let x=0;x<canvas.width;x+=100){ctx.fillStyle = h.route.color;
-    ctx.beginPath();
-    ctx.arc(h.pos.x,h.pos.y,8,0,Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle='#000';
-    ctx.fillText(h.route.name,h.pos.x+10,h.pos.y);
-  });
+  // デバッグ文字
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px sans-serif';
+  ctx.fillText('Canvas 描画テスト OK',20,40);
+  ctx.fillText('もしこれが見えなければ環境問題です',20,70);
 
-  requestAnimationFrame(tick);
+  // 確実に動く円
+  const speed = Number(scaleEl.value);
+  const x = 100 + (t % 600);
+  const y = 200 + (t % 400);
+
+  ctx.fillStyle = 'red';
+  ctx.beginPath();
+  ctx.arc(x,y,15,0,Math.PI*2);
+  ctx.fill();
+
+  t += speed;
+  requestAnimationFrame(draw);
 }
 
-// イベント登録（horses未初期化対策）
-document.getElementById('reset').onclick = ()=>resetSim();
-document.getElementById('whip0').onclick = ()=>useWhip(0);
-document.getElementById('bee5').onclick = ()=>useBee(5);
+// 起動
+requestAnimationFrame(draw);
 
-// 背景画像の有無に関わらずシミュレーション開始
-resetSim();
-requestAnimationFrame(tick);
-
-// 画像が読み込めたら次フレームから反映
-bg.onload = ()=>{
-  // 何もしなくても次の tick で描画される
-};
+document.getElementById('reset').onclick = ()=>{t=0;};
 </script>
 </body>
 </html>
