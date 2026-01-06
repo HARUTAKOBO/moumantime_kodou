@@ -20,12 +20,14 @@ hr{border:0;border-top:1px solid #444;margin:8px 0}
 <div class="wrap">
 <div class="panel">
 <strong>ノード追加</strong>
-<button onclick="addNode('start')">➕ スタート</button>
-<button onclick="addNode('inn_small')">➕ 小宿</button>
-<button onclick="addNode('inn_big')">➕ 大宿</button>
-<button onclick="addNode('fork')">➕ 分岐</button>
-<button onclick="addNode('merge')">➕ 合流</button>
-<button onclick="addNode('goal')">➕ ゴール</button>
+<div style="margin-bottom:6px">現在の配置モード：<span id="placeMode">なし</span></div>
+<button onclick="setPlaceMode('start')">📍 スタートを連続配置</button>
+<button onclick="setPlaceMode('inn_small')">📍 小宿を連続配置</button>
+<button onclick="setPlaceMode('inn_big')">📍 大宿を連続配置</button>
+<button onclick="setPlaceMode('fork')">📍 分岐を連続配置</button>
+<button onclick="setPlaceMode('merge')">📍 合流を連続配置</button>
+<button onclick="setPlaceMode('goal')">📍 ゴールを連続配置</button>
+<button onclick="clearPlaceMode()">⛔ 配置モード解除</button>
 <hr>
 <button onclick="startSim()">▶ シミュレーション開始</button>
 <button onclick="resetSim()">🔄 リセット</button>
@@ -47,10 +49,21 @@ const bg=new Image(); bg.src='map.png';
 const scaleEl=document.getElementById('scale');
 const teams=['桂州','寿州','江州','涪州','永州','光州'];
 let nodes=[]; let selected=null; let drag=null;
+let placeMode=null; // 連続配置モード
 let horses=[]; let running=false;
 
-function addNode(type){
-  nodes.push({id:Date.now()+Math.random(),x:450,y:600,type,teams:[...teams]});
+function addNode(type,x=450,y=600){
+  nodes.push({id:Date.now()+Math.random(),x,y,type,teams:[...teams]});
+}
+
+function setPlaceMode(type){
+  placeMode = type;
+  document.getElementById('placeMode').textContent = type;
+}
+function clearPlaceMode(){
+  placeMode = null;
+  document.getElementById('placeMode').textContent = 'なし';
+});
 }
 
 function resetSim(){ running=false; horses=[]; }
@@ -111,7 +124,24 @@ function draw(){
 
 // ===== 操作 =====
 function getPos(e){const r=canvas.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
-canvas.onmousedown=e=>{const m=getPos(e); selected=null; for(const n of nodes){if(Math.hypot(n.x-m.x,n.y-m.y)<10){selected=n;drag=n;break}} updatePanel();}
+canvas.onmousedown=e=>{
+  const m=getPos(e);
+  selected=null;
+
+  // 連続配置モードならクリックでノード追加
+  if(placeMode){
+    addNode(placeMode,m.x,m.y);
+    return;
+  }
+
+  // 通常選択・ドラッグ
+  for(const n of nodes){
+    if(Math.hypot(n.x-m.x,n.y-m.y)<10){
+      selected=n;drag=n;break;
+    }
+  }
+  updatePanel();
+}
 canvas.onmousemove=e=>{if(drag){const m=getPos(e);drag.x=m.x;drag.y=m.y}}
 canvas.onmouseup=()=>drag=null;
 
